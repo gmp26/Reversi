@@ -1,11 +1,11 @@
-package com.adobe.components
+package com.christiancantrell.components
 {
 	import flash.display.GradientType;
 	import flash.display.Sprite;
 	
 	public class Button extends Sprite
 	{
-		public function SimpleButton(label:String, forcedWidth:int = -1, forcedHeight:int = -1)
+		public function Button(label:String, forcedWidth:int = -1, forcedHeight:int = -1)
 		{
 			super();
 						

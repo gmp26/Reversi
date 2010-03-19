@@ -1,4 +1,4 @@
-package com.adobe.components
+package com.christiancantrell.components
 {
 	import flash.display.Sprite;
 	import flash.text.AntiAliasType;
@@ -9,11 +9,11 @@ package com.adobe.components
 	{
 		public var textField:TextField;
 		
-		public function SimpleDynamicLabel(initialText:String,
-										   fontWeight:String = "normal",
-										   color:int = 0xffffff,
-										   font:String = "_sans",
-										   size:uint = 18)
+		public function DynamicLabel(initialText:String,
+									 fontWeight:String = "normal",
+									 color:int = 0xffffff,
+									 font:String = "_sans",
+									 size:uint = 18)
 		{
 			super();
 			
