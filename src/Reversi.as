@@ -1,6 +1,10 @@
 package
 {
+	import com.christiancantrell.components.Alert;
+	import com.christiancantrell.components.AlertEvent;
+	import com.christiancantrell.components.Button;
 	import com.christiancantrell.components.Label;
+	import com.christiancantrell.models.Turn;
 	import com.christiancantrell.pieces.Board;
 	import com.christiancantrell.utils.Layout;
 	import com.christiancantrell.utils.Ruler;
@@ -14,43 +18,54 @@ package
 	
 	public class Reversi extends Sprite
 	{
-		private const WHITE_COLOR:uint      = 0xffffff;
-		private const BLACK_COLOR:uint      = 0x000000;
-		private const BOARD_COLOR:uint      = 0x00ff00;
-		private const BOARD_LINES:uint      = 0x000000;
-		private const BACKGROUND_COLOR:uint = 0xcc9900;
-		private const TITLE_COLOR:uint      = 0x000000;
-		private const TURN_GLOW:uint        = 0x0000ff;
+		private const WHITE_COLOR:uint        = 0xffffff;
+		private const WHITE_COLOR_NAME:String = "White";
+		private const BLACK_COLOR:uint        = 0xff0000;
+		private const BLACK_COLOR_NAME:String = "Red";
+		private const BOARD_COLOR:uint        = 0x000000;
+		private const BOARD_LINES:uint        = 0xffffff;
+		private const BACKGROUND_COLOR:uint   = 0x666666;
+		private const TITLE_COLOR:uint        = 0xffffff;
+		private const TURN_GLOW:uint          = 0x0000ff;
 		
 		private const TITLE:String = "Reversi";
 		
 		private const WHITE:Boolean = true;
 		private const BLACK:Boolean = false;
 		
+		private const PORTRAIT:String = "portrait";
+		private const LANDSCAPE:String = "landscape";
+		
 		private var board:Sprite;
 		private var stones:Array;
 		private var turn:Boolean;
-		
+		private var pieces:Vector.<Sprite>;
+		private var history:Array;
 		private var title:Label;
-		private var blackScoreLabel:Label;
-		private var whiteScoreLabel:Label;
-		private var blackScoreCircle:Sprite;
-		private var whiteScoreCircle:Sprite;
+		private var blackScoreLabel:Label, whiteScoreLabel:Label;
+		private var backButton:Button, nextButton:Button;
 		private var blackScore:uint;
 		private var whiteScore:uint;
 		private var turnGlow:GlowFilter;
-		private var dpi:uint;
+		private var ppi:uint;
 		
 		public function Reversi()
 		{
 			super();
-			this.dpi = Capabilities.screenDPI;
-			this.initStones();
-			this.turn = BLACK;
-			this.blackScore = 0;
-			this.whiteScore = 0;
+			this.ppi = Capabilities.screenDPI;
+			this.prepareGame();
 			this.initUIComponents();
 			this.addEventListener(Event.ADDED, onAddedToDisplayList);
+		}
+		
+		private function prepareGame():void
+		{
+			this.pieces = new Vector.<Sprite>(64);
+			this.history = new Array();
+			this.initStones();
+			this.turn = BLACK;  // Black always starts
+			this.blackScore = 2;
+			this.whiteScore = 2;
 		}
 		
 		private function onAddedToDisplayList(e:Event):void
@@ -61,7 +76,7 @@ package
 		
 		private function initUIComponents():void
 		{
-			var titleSize:uint = Ruler.mmToPixels(5, this.dpi);
+			var titleSize:uint = Ruler.mmToPixels(7, this.ppi);
 			this.title = new Label(TITLE, "bold", TITLE_COLOR, "_sans", titleSize);
 			this.turnGlow = new GlowFilter(TURN_GLOW, 1, 10, 10);
 		}
@@ -70,7 +85,8 @@ package
 		{
 			// Remove any children that have already been added.
 			while (this.numChildren > 0) this.removeChildAt(0);
-
+			this.pieces = new Vector.<Sprite>(64);
+			
 			var stageWidth:uint = this.stage.stageWidth;
 			var stageHeight:uint = this.stage.stageHeight;
 			
@@ -127,79 +143,149 @@ package
 			this.placeStones();
 			this.board.addEventListener(MouseEvent.CLICK, onBoardClicked);
 			
-			this.title.y = 14;
-			this.blackScoreCircle = new Sprite();
-			this.whiteScoreCircle = new Sprite();
-			var gutterWidth:uint, gutterHeight:uint, scoreCircleSize:uint;
-			if (stageHeight > stageWidth) // Portrait
+			// Scores
+			var scoreSize:uint = (this.getOrientation() == PORTRAIT) ? Ruler.mmToPixels(this.ppi, 25) : Ruler.mmToPixels(this.ppi, 35);
+			this.blackScoreLabel = new Label(String(this.blackScore), "normal", BLACK_COLOR, "_sans", scoreSize);
+			this.whiteScoreLabel = new Label(String(this.whiteScore), "normal", WHITE_COLOR, "_sans", scoreSize);
+
+			this.title.y = 22;
+			var gutterWidth:uint, gutterHeight:uint;
+			var newGameButton:Button, buttonWidth:Number, buttonHeight:Number;
+			if (this.getOrientation() == PORTRAIT) // Portrait
 			{
-				gutterWidth = stageWidth;
-				gutterHeight = (stageHeight - boardSize) / 2;
-
-				// Title
 				Layout.centerHorizontally(this.title, this.stage);
+				this.alignScores();
 
-				// Score circles
-				scoreCircleSize = gutterHeight - 20;
-
-				// Black score circle
-				this.blackScoreCircle.graphics.beginFill(BLACK_COLOR);
-				this.blackScoreCircle.graphics.drawCircle(0, 0, scoreCircleSize / 2);
-				this.blackScoreCircle.x = (gutterWidth / 4);
-				this.blackScoreCircle.y = (gutterHeight / 2);
-				this.addChild(this.blackScoreCircle);
-
-				// White score circle
-				this.whiteScoreCircle.graphics.beginFill(WHITE_COLOR);
-				this.whiteScoreCircle.graphics.drawCircle(0, 0, scoreCircleSize / 2);
-				this.whiteScoreCircle.x = gutterWidth - (gutterWidth / 4);
-				this.whiteScoreCircle.y = (gutterHeight / 2);
-				this.addChild(this.whiteScoreCircle);
+				buttonWidth = stageWidth / 3;
+				buttonHeight = Ruler.mmToPixels(10, this.ppi);
+				
+				this.backButton = new Button("Back", buttonWidth, buttonHeight);
+				this.backButton.addEventListener(MouseEvent.CLICK, this.onBack);
+				this.backButton.x = 0;
+				this.backButton.y = (stageHeight - this.backButton.height);
+				this.addChild(this.backButton);
+				
+				newGameButton = new Button("New Game", buttonWidth, buttonHeight);
+				newGameButton.x = this.backButton.width;
+				newGameButton.y = (stageHeight - newGameButton.height);
+				newGameButton.addEventListener(MouseEvent.CLICK, onNewGameButtonClicked);
+				this.addChild(newGameButton);
+				
+				this.nextButton = new Button("Next", buttonWidth, buttonHeight);
+				this.nextButton.addEventListener(MouseEvent.CLICK, this.onNext);
+				this.nextButton.x = newGameButton.x + newGameButton.width;
+				this.nextButton.y = (stageHeight - this.nextButton.height);
+				this.addChild(this.nextButton);
 			}
 			else // Landscape
 			{
 				gutterWidth = (stageWidth - boardSize) / 2;
-				gutterHeight = stageHeight;
-				
-				// Title
 				this.title.x = (boardX / 2) - (this.title.width / 2);
 
-				// Score circles
-				scoreCircleSize = gutterWidth - 50;
+				buttonWidth = gutterWidth - 10;
+				buttonHeight = Ruler.mmToPixels(10, this.ppi);
+
+				newGameButton = new Button("New Game", buttonWidth, buttonHeight);
+				newGameButton.x = (stageWidth - gutterWidth) + ((gutterWidth - newGameButton.width) / 2);
+				newGameButton.y = 5;
+				newGameButton.addEventListener(MouseEvent.CLICK, onNewGameButtonClicked);
+				this.addChild(newGameButton);
+
+				this.backButton = new Button("Back", buttonWidth, buttonHeight);
+				this.backButton.addEventListener(MouseEvent.CLICK, this.onBack);
+				this.backButton.x = (gutterWidth - this.backButton.width) / 2;
+				this.backButton.y = (stageHeight - this.backButton.height) - 5;
+				this.addChild(this.backButton);
 				
-				// Black score circle
-				this.blackScoreCircle.graphics.beginFill(BLACK_COLOR);
-				this.blackScoreCircle.graphics.drawCircle(0, 0, scoreCircleSize / 2);
-				this.blackScoreCircle.x = (gutterWidth / 2);
-				this.blackScoreCircle.y = (gutterHeight / 3);
-				this.addChild(this.blackScoreCircle);
-				
-				// White score circle
-				this.whiteScoreCircle.graphics.beginFill(WHITE_COLOR);
-				this.whiteScoreCircle.graphics.drawCircle(0, 0, scoreCircleSize / 2);
-				this.whiteScoreCircle.x = stageWidth - (gutterWidth / 2);
-				this.whiteScoreCircle.y = gutterHeight / 3;
-				this.addChild(this.whiteScoreCircle);
+				this.nextButton = new Button("Next", buttonWidth, buttonHeight);
+				this.nextButton.addEventListener(MouseEvent.CLICK, this.onNext);
+				this.nextButton.x = newGameButton.x;
+				this.nextButton.y = (stageHeight - this.nextButton.height) - 5;
+				this.addChild(this.nextButton);
 			}
 			this.addChild(title);
-			
-			// Black score
-			this.blackScoreLabel = new Label(String(this.blackScore), "normal", WHITE_COLOR, "_sans", scoreCircleSize - 4);
-			this.alignScores(this.blackScoreLabel, this.blackScoreCircle);
-			this.blackScoreCircle.addChild(this.blackScoreLabel);
-			
-			// White score
-			this.whiteScoreLabel = new Label(String(this.whiteScore), "normal", BLACK_COLOR, "_sans", scoreCircleSize - 4);
-			this.alignScores(this.whiteScoreLabel, this.whiteScoreCircle);
-			this.whiteScoreCircle.addChild(this.whiteScoreLabel);
-			
+			this.alignScores();
+			this.addChild(this.blackScoreLabel);
+			this.addChild(this.whiteScoreLabel);
 			this.changeTurnIndicator();
 		}
 		
-		private function alignScores(label:Label, circle:Sprite):void
+		private function alignScores():void
 		{
-			label.x = 0;
-			label.y = 0;
+			var gutterDimensions:Object = this.getGutterDimensions();
+			if (this.getOrientation() == LANDSCAPE)
+			{
+				Layout.centerVertically(this.blackScoreLabel, this.stage);
+				this.blackScoreLabel.x = (gutterDimensions.width / 2) - (this.blackScoreLabel.textWidth / 2);
+				Layout.centerVertically(this.whiteScoreLabel, this.stage);
+				this.whiteScoreLabel.x = this.stage.stageWidth - ((gutterDimensions.width / 2) + (this.whiteScoreLabel.textWidth / 2));
+			}
+			else
+			{
+				this.blackScoreLabel.y = (gutterDimensions.height / 2) + (this.blackScoreLabel.textHeight / 2);
+				this.blackScoreLabel.x = (gutterDimensions.width / 4) - (this.blackScoreLabel.textWidth / 2);
+				
+				this.whiteScoreLabel.y = (gutterDimensions.height / 2) + (this.whiteScoreLabel.textHeight / 2);
+				this.whiteScoreLabel.x = (gutterDimensions.width) - ((gutterDimensions.width / 4) + (this.blackScoreLabel.textWidth / 2));
+			}
+		}
+		
+		private function getOrientation():String
+		{
+			return (this.stage.stageHeight > this.stage.stageWidth) ? PORTRAIT : LANDSCAPE;
+		}
+
+		private function getGutterDimensions():Object
+		{
+			var gutter:Object = new Object();
+			var gutterWidth:uint, gutterHeight:uint;
+			if (this.getOrientation() == PORTRAIT)
+			{
+				gutterWidth = this.stage.stageWidth;
+				gutterHeight = (this.stage.stageHeight - this.board.width) / 2;
+			}
+			else
+			{
+				gutterWidth = (this.stage.stageWidth - this.board.width) / 2;
+				gutterHeight = this.stage.stageHeight;
+			}
+			gutter.width = gutterWidth;
+			gutter.height = gutterHeight;
+			return gutter;
+		}
+		
+		private function onBack(e:MouseEvent):void
+		{
+			if (this.history.length == 0) return;
+			var turn:Turn = this.history.pop();
+			this.stones[turn.x][turn.y] = null;
+			this.findCaptures(!turn.player, turn.x, turn.y, true);
+		}
+		
+		private function onNext(e:MouseEvent):void
+		{
+			
+		}
+		
+		private function onNewGameButtonClicked(e:MouseEvent):void
+		{
+			var alert:Alert = new Alert(this.stage, this.ppi);
+			alert.addEventListener(AlertEvent.ALERT_CLICKED, onNewGameConfirm);
+			alert.show("Confirm", "Are you sure you want to start a new game?", ["Yes", "No"]);
+		}
+		
+		private function onNewGameConfirm(e:AlertEvent):void
+		{
+			var alert:Alert = e.target as Alert;
+			alert.removeEventListener(AlertEvent.ALERT_CLICKED, onNewGameConfirm);
+			if (e.label == "Yes")
+			{
+				while (this.board.numChildren > 0) this.board.removeChildAt(0);
+				this.prepareGame();
+				this.placeStones();
+				this.changeTurnIndicator();
+				this.calculateScore();
+			}
 		}
 		
 		private function initStones():void
@@ -231,24 +317,21 @@ package
 		
 		private function placeStone(color:Boolean, x:uint, y:uint):void
 		{
+			var index:uint = (y * 8) + x;
 			var cellSize:Number = (this.board.width / 8); 
 			var stoneSize:Number = cellSize - 2;
+			if (this.pieces[index] != null)
+			{
+				this.board.removeChild(Sprite(this.pieces[index]));
+			}
 			var stone:Sprite = new Sprite();
+			this.pieces[index] = stone;
 			stone.mouseEnabled = false;
 			stone.graphics.beginFill((color == WHITE) ? WHITE_COLOR : BLACK_COLOR);
 			stone.graphics.drawCircle(stoneSize/2, stoneSize/2, stoneSize/2);
 			stone.graphics.endFill();
 			stone.x = (x * cellSize) + 1;
 			stone.y = (y * cellSize) + 1;
-			// TBD: Is this the best way to remove turned stones? Could be a performance problem.
-			for (var i:uint = 0; i < this.board.numChildren; ++i)
-			{
-				var testStone:Sprite = this.board.getChildAt(i) as Sprite;
-				if (testStone.x == stone.x && testStone.y == stone.y)
-				{
-					this.board.removeChild(testStone);
-				}
-			}
 			this.board.addChild(stone);
 		}
 		
@@ -258,27 +341,28 @@ package
 			var x:uint = e.localX / scaleFactor;
 			var y:uint = e.localY / scaleFactor;
 			if (this.stones[x][y] != null) return;
-			if (!this.findCaptures(this.turn, x, y)) return;
+			if (!this.findCaptures(this.turn, x, y, true)) return;
 			this.placeStone(this.turn, x, y);
 			this.stones[x][y] = this.turn;
-			this.turn = !this.turn;
+			var turn:Turn = new Turn(x, y, this.turn);
+			this.history.push(turn);
 			this.onTurnFinished();
 		}
 		
-		private function findCaptures(turn:Boolean, x:uint, y:uint):Boolean
+		private function findCaptures(turn:Boolean, x:uint, y:uint, turnStones:Boolean):Boolean
 		{
-			var topLeft:Boolean     = this.walkPath(turn, x, y, -1, -1); // top left
-			var top:Boolean         = this.walkPath(turn, x, y,  0, -1); // top
-			var topRight:Boolean    = this.walkPath(turn, x, y,  1, -1); // top right
-			var right:Boolean       = this.walkPath(turn, x, y,  1,  0); // right
-			var bottomRight:Boolean = this.walkPath(turn, x, y,  1,  1); // bottom right
-			var bottom:Boolean      = this.walkPath(turn, x, y,  0,  1); // bottom
-			var bottomLeft:Boolean  = this.walkPath(turn, x, y, -1, +1); // bottom left
-			var left:Boolean        = this.walkPath(turn, x, y, -1,  0); // left
+			var topLeft:Boolean     = this.walkPath(turn, x, y, -1, -1, turnStones); // top left
+			var top:Boolean         = this.walkPath(turn, x, y,  0, -1, turnStones); // top
+			var topRight:Boolean    = this.walkPath(turn, x, y,  1, -1, turnStones); // top right
+			var right:Boolean       = this.walkPath(turn, x, y,  1,  0, turnStones); // right
+			var bottomRight:Boolean = this.walkPath(turn, x, y,  1,  1, turnStones); // bottom right
+			var bottom:Boolean      = this.walkPath(turn, x, y,  0,  1, turnStones); // bottom
+			var bottomLeft:Boolean  = this.walkPath(turn, x, y, -1, +1, turnStones); // bottom left
+			var left:Boolean        = this.walkPath(turn, x, y, -1,  0, turnStones); // left
 			return (topLeft || top || topRight || right || bottomRight || bottom || bottomLeft || left) ? true : false;
 		}
 		
-		private function walkPath(turn:Boolean, x:uint, y:uint, xFactor:int, yFactor:int):Boolean
+		private function walkPath(turn:Boolean, x:uint, y:uint, xFactor:int, yFactor:int, turnStones:Boolean):Boolean
 		{
 			// Are we in bounds?
 			if (x + xFactor > 7 || x + xFactor < 0 || y + yFactor > 7 || y + yFactor < 0)
@@ -313,7 +397,7 @@ package
 				nextStone = this.stones[tmpX][tmpY];
 				if (nextStone == turn) // Capture!
 				{
-					this.turnStones(turn, x, y, tmpX, tmpY, xFactor, yFactor);
+					if (turnStones) this.turnStones(turn, x, y, tmpX, tmpY, xFactor, yFactor);
 					return true;
 				}
 			}
@@ -335,21 +419,69 @@ package
 		
 		private function onTurnFinished():void
 		{
-			this.changeTurnIndicator();
 			this.calculateScore();
+			if ((this.blackScore + this.whiteScore) == 64) // All stomes played. Game is over.
+			{
+				var allStonesPlayedAlert:Alert = new Alert(this.stage, this.ppi);
+				var winner:String = (this.blackScore > this.whiteScore) ? BLACK_COLOR_NAME : WHITE_COLOR_NAME;
+				allStonesPlayedAlert.show(winner + " Wins!", "All stones have been played, so the game is over. Well done, " + winner + "!");
+				return;
+			}
+			
+			if (this.isNextMovePossible())
+			{
+				this.changeTurn();
+				return;
+			}
+			
+			if (this.blackScore == 0 || this.whiteScore == 0) // All stones captured. Game over.
+			{
+				var allStonesCapturedAlert:Alert = new Alert(this.stage, this.ppi);
+				var zeroPlayer:String = (this.blackScore == 0) ? BLACK_COLOR_NAME : WHITE_COLOR_NAME;
+				var nonZeroPlayer:String = (this.blackScore != 0) ? BLACK_COLOR_NAME : WHITE_COLOR_NAME;
+				allStonesCapturedAlert.show(nonZeroPlayer + " Wins!", nonZeroPlayer + " has captured all of " + zeroPlayer + "'s stones. Well done, " + nonZeroPlayer + "!");
+				return;
+			}
+			else // Game isn't over, but opponent can't place stone.
+			{
+				var noNextMoveAlert:Alert = new Alert(this.stage, this.ppi);
+				var side:String = (this.turn == WHITE) ? BLACK_COLOR_NAME : WHITE_COLOR_NAME;
+				var otherSide:String = (this.turn != WHITE) ? BLACK_COLOR_NAME : WHITE_COLOR_NAME;
+				noNextMoveAlert.show("No Move Available", side + " has no possible moves, and therefore must pass. It's still " + otherSide + "'s turn.");
+			}
+		}
+		
+		private function isNextMovePossible():Boolean
+		{
+			var capturesFound:Boolean = false;
+			for (var x:uint = 0; x < 8; ++x)
+			{
+				for (var y:uint = 0; y < 8; ++y)
+				{
+					if (this.stones[x][y] != null) continue;
+					if (this.findCaptures(!this.turn, x, y, false)) return true;
+				}
+			}
+			return capturesFound;
+		}
+		
+		private function changeTurn():void
+		{
+			this.turn = !this.turn;
+			this.changeTurnIndicator();
 		}
 		
 		private function changeTurnIndicator():void
 		{
 			if (this.turn == WHITE)
 			{
-				this.whiteScoreCircle.filters = [this.turnGlow];
-				this.blackScoreCircle.filters = null;
+				this.whiteScoreLabel.filters = [this.turnGlow];
+				this.blackScoreLabel.filters = null;
 			}
 			else
 			{
-				this.blackScoreCircle.filters = [this.turnGlow];
-				this.whiteScoreCircle.filters = null;
+				this.blackScoreLabel.filters = [this.turnGlow];
+				this.whiteScoreLabel.filters = null;
 			}
 		}
 		
@@ -379,6 +511,7 @@ package
 			this.whiteScore = white;
 			this.whiteScoreLabel.update(String(this.whiteScore));
 			this.blackScoreLabel.update(String(this.blackScore));
+			this.alignScores();
 		}
 	}
 }

@@ -21,7 +21,7 @@ package com.christiancantrell.models
 			return this._y;
 		}
 		
-		public function get player():uint
+		public function get player():Boolean
 		{
 			return this._player;
 		}

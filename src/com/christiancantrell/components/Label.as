@@ -18,18 +18,17 @@ package com.christiancantrell.components
 		public function Label(text:String, fontWeight:String = "normal", fontColor:int = 0xffffff, fontName:String = "_sans", fontSize:uint = 18)
 		{
 			super();
-			
 			var fontDesc:FontDescription = new FontDescription(fontName, fontWeight);
 			var elementFormat:ElementFormat = new ElementFormat(fontDesc, fontSize, fontColor);
 			this.textElement = new TextElement(text, elementFormat);
 			this.textBlock = new TextBlock(textElement);
-			this.textBlock.baselineZero = TextBaseline.IDEOGRAPHIC_TOP;
+			this.textBlock.baselineZero = TextBaseline.DESCENT;
 			this.drawText();
 		}
 		
 		public function get textWidth():Number
 		{
-			return this.textLine.textWidth;
+			return this.textLine.width;
 		}
 		
 		public function get textHeight():Number
@@ -53,6 +52,11 @@ package com.christiancantrell.components
 		{
 			this.textElement.text = newText;
 			this.drawText();
+		}
+
+		public function get text():String
+		{
+			return this.textElement.text;
 		}
 	}
 }

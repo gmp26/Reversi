@@ -8,6 +8,7 @@ package com.christiancantrell.components
 	import flash.display.Sprite;
 	import flash.display.Stage;
 	import flash.events.MouseEvent;
+	import flash.filters.BlurFilter;
 	
 	[Event(name=AlertEvent.ALERT_CLICKED, type="com.christiancantrell.components.AlertEvent")]
 	public class Alert extends Sprite
@@ -15,6 +16,7 @@ package com.christiancantrell.components
 		private const BACKGROUND_COLOR:uint   = 0x0000ff;
 		private const BACKGROUND_ALPHA:Number = .85;
 		private const BORDER_COLOR:uint       = 0xffffff;
+		private const MODAL_COLOR:uint        = 0x000000;
 		private const FONT_COLOR:uint         = 0xffffff;
 		private const CORNER:uint             = 20;
 		private const MARGIN:uint             = 15;
@@ -32,15 +34,17 @@ package com.christiancantrell.components
 		{
 			var bgWidth:uint = (this._stage.stageWidth < 300) ? this._stage.stageWidth - 20 : 300;
 			
+			var box:Sprite = new Sprite();
+			
 			var titleLabel:Label = new Label(title, "bold", FONT_COLOR);
 			titleLabel.x = (bgWidth / 2) - (titleLabel.width / 2);
 			titleLabel.y = 15 + MARGIN;
-			this.addChild(titleLabel);
+			box.addChild(titleLabel);
 
 			var messageLabel:MultilineLabel = new MultilineLabel(message, bgWidth - (MARGIN * 2), -1, "normal", FONT_COLOR);
 			messageLabel.x = MARGIN;
 			messageLabel.y = titleLabel.y + (MARGIN * 1.5);
-			this.addChild(messageLabel);
+			box.addChild(messageLabel);
 						
 			var buttonCount:uint = (buttonLabels == null) ? 0 : buttonLabels.length;
 			var buttonHeight:uint = Ruler.mmToPixels(Ruler.MIN_BUTTON_SIZE_MM, this._ppi) + 10;
@@ -50,7 +54,7 @@ package com.christiancantrell.components
 				var button_1:Sprite = this.getButton(buttonLabels[0], bgWidth - (MARGIN * 2), buttonHeight);
 				button_1.x = (bgWidth / 2) - (button_1.width / 2);
 				button_1.y = (messageLabel.y + messageLabel.textHeight) + MARGIN;
-				this.addChild(button_1);
+				box.addChild(button_1);
 			}
 			else if (buttonCount == 2)
 			{
@@ -60,8 +64,8 @@ package com.christiancantrell.components
 				button_2.y = (messageLabel.y + messageLabel.textHeight) + MARGIN;
 				button_3.x = button_2.x + button_2.width + MARGIN;
 				button_3.y = button_2.y;
-				this.addChild(button_2);
-				this.addChild(button_3);
+				box.addChild(button_2);
+				box.addChild(button_3);
 			}
 			else if (buttonCount > 2)
 			{
@@ -71,24 +75,34 @@ package com.christiancantrell.components
 					var button:Sprite = this.getButton(buttonLabels[i], bgWidth - (MARGIN * 2), buttonHeight);
 					button.x = (bgWidth / 2) - (button.width / 2);
 					button.y = buttonY;
-					this.addChild(button);
+					box.addChild(button);
 					buttonY += buttonHeight + MARGIN;
 				}
 			}
 			
 			if (buttonCount == 2) buttonCount = 1;
-			var bgHeight:uint = (messageLabel.height + titleLabel.textHeight + (buttonCount * buttonHeight) + (MARGIN * (buttonCount + 2)));
+			var bgHeight:uint = (messageLabel.height + titleLabel.textHeight + (buttonCount * buttonHeight) + (MARGIN * (buttonCount + 2))) + 10;
 			
-			this.graphics.beginFill(BACKGROUND_COLOR, BACKGROUND_ALPHA);
-			this.graphics.drawRoundRect(0, 0, bgWidth, bgHeight, CORNER, CORNER);
-			this.graphics.endFill();
+			box.graphics.beginFill(BACKGROUND_COLOR, BACKGROUND_ALPHA);
+			box.graphics.drawRoundRect(0, 0, bgWidth, bgHeight, CORNER, CORNER);
+			box.graphics.endFill();
 
-			this.graphics.drawRoundRect(0, 0, bgWidth, bgHeight, CORNER, CORNER);
-			this.graphics.lineStyle(2, BORDER_COLOR, 1, true, "normal", CapsStyle.NONE);
-			this.graphics.drawRoundRect(0, 0, bgWidth, bgHeight, CORNER, CORNER);
+			box.graphics.drawRoundRect(0, 0, bgWidth, bgHeight, CORNER, CORNER);
+			box.graphics.lineStyle(2, BORDER_COLOR, 1, true, "normal", CapsStyle.NONE);
+			box.graphics.drawRoundRect(0, 0, bgWidth, bgHeight, CORNER, CORNER);
 			
-			this.x = (this._stage.stageWidth / 2) - (this.width / 2);
-			this.y = (this._stage.stageHeight / 2) - (this.height / 2);
+			box.x = (this._stage.stageWidth / 2) - (box.width / 2);
+			box.y = (this._stage.stageHeight / 2) - (box.height / 2);
+			
+			// Modal
+			this.x = 0;
+			this.y = 0;
+			this.graphics.beginFill(MODAL_COLOR, .5);
+			this.graphics.drawRect(0, 0, _stage.stageWidth, _stage.stageHeight);
+			this.graphics.endFill();
+			
+			this.addChild(box);
+				
 			this._stage.addChild(this);
 			
 			if (buttonCount == 0) this.addEventListener(MouseEvent.CLICK, onClick);
@@ -106,6 +120,7 @@ package com.christiancantrell.components
 			Layout.center(label, button);
 			button.addChild(label);
 			button.addEventListener(MouseEvent.CLICK, onButtonClick);
+			button.mouseChildren = false;
 			return button;
 		}
 		
@@ -119,8 +134,8 @@ package com.christiancantrell.components
 		private function onButtonClick(e:MouseEvent):void
 		{
 			e.stopPropagation();
-			var button:Sprite = e.target as Sprite;
 			this._stage.removeChild(this);
+			var button:Sprite = e.target as Sprite;
 			var label:Label = button.getChildAt(0) as Label;
 			var ae:AlertEvent = new AlertEvent();
 			ae.label = label.text;

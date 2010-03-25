@@ -2,6 +2,9 @@ package com.christiancantrell.utils
 {
 	public class Ruler
 	{
+		public static const MIN_BUTTON_SIZE_MM:uint       = 7;
+		public static const MIN_BUTTON_SIZE_INCHES:Number = 0.27559055;
+		
 		/**
 		 * Convert inches to pixels.
 		 */
