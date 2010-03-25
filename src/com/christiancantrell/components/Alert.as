@@ -7,6 +7,7 @@ package com.christiancantrell.components
 	import flash.display.JointStyle;
 	import flash.display.Sprite;
 	import flash.display.Stage;
+	import flash.events.Event;
 	import flash.events.MouseEvent;
 	import flash.filters.BlurFilter;
 	
@@ -23,6 +24,9 @@ package com.christiancantrell.components
 		
 		private var _stage:Stage;
 		private var _ppi:uint;
+		private var _title:String;
+		private var _message:String;
+		private var _buttonLabels:Array;
 
 		public function Alert(stage:Stage, ppi:uint)
 		{
@@ -32,34 +36,47 @@ package com.christiancantrell.components
 		
 		public function show(title:String, message:String, buttonLabels:Array = null):void
 		{
-			var bgWidth:uint = (this._stage.stageWidth < 300) ? this._stage.stageWidth - 20 : 300;
+			this._title = title;
+			this._message = message;
+			this._buttonLabels = buttonLabels;
+			this._stage.addEventListener(Event.RESIZE, doLayout);
+			this.doLayout();
+		}
+			
+		public function doLayout(e:Event = null):void
+		{
+			while (this.numChildren > 0) this.removeChildAt(0);
+			this.graphics.clear();
+			if (this._stage.contains(this)) this._stage.removeChild(this);
+
+			var bgWidth:uint = (this._stage.stageHeight > this._stage.stageWidth) ? (this._stage.stageWidth * .75) : (this._stage.stageHeight * .8);
 			
 			var box:Sprite = new Sprite();
 			
-			var titleLabel:Label = new Label(title, "bold", FONT_COLOR);
+			var titleLabel:Label = new Label(this._title, "bold", FONT_COLOR);
 			titleLabel.x = (bgWidth / 2) - (titleLabel.width / 2);
 			titleLabel.y = 15 + MARGIN;
 			box.addChild(titleLabel);
 
-			var messageLabel:MultilineLabel = new MultilineLabel(message, bgWidth - (MARGIN * 2), -1, "normal", FONT_COLOR);
+			var messageLabel:MultilineLabel = new MultilineLabel(_message, bgWidth - (MARGIN * 2), -1, "normal", FONT_COLOR);
 			messageLabel.x = MARGIN;
 			messageLabel.y = titleLabel.y + (MARGIN * 1.5);
 			box.addChild(messageLabel);
 						
-			var buttonCount:uint = (buttonLabels == null) ? 0 : buttonLabels.length;
+			var buttonCount:uint = (this._buttonLabels == null) ? 0 : this._buttonLabels.length;
 			var buttonHeight:uint = Ruler.mmToPixels(Ruler.MIN_BUTTON_SIZE_MM, this._ppi) + 10;
 			
 			if (buttonCount == 1)
 			{
-				var button_1:Sprite = this.getButton(buttonLabels[0], bgWidth - (MARGIN * 2), buttonHeight);
+				var button_1:Sprite = this.getButton(this._buttonLabels[0], bgWidth - (MARGIN * 2), buttonHeight);
 				button_1.x = (bgWidth / 2) - (button_1.width / 2);
 				button_1.y = (messageLabel.y + messageLabel.textHeight) + MARGIN;
 				box.addChild(button_1);
 			}
 			else if (buttonCount == 2)
 			{
-				var button_2:Sprite = this.getButton(buttonLabels[0], (bgWidth - (MARGIN * 3)) / 2, buttonHeight);
-				var button_3:Sprite = this.getButton(buttonLabels[1], (bgWidth - (MARGIN * 3)) / 2, buttonHeight);
+				var button_2:Sprite = this.getButton(this._buttonLabels[0], (bgWidth - (MARGIN * 3)) / 2, buttonHeight);
+				var button_3:Sprite = this.getButton(this._buttonLabels[1], (bgWidth - (MARGIN * 3)) / 2, buttonHeight);
 				button_2.x = MARGIN;
 				button_2.y = (messageLabel.y + messageLabel.textHeight) + MARGIN;
 				button_3.x = button_2.x + button_2.width + MARGIN;
@@ -70,9 +87,9 @@ package com.christiancantrell.components
 			else if (buttonCount > 2)
 			{
 				var buttonY:uint = (messageLabel.y + messageLabel.textHeight) + MARGIN;
-				for (var i:uint = 0; i < buttonLabels.length; ++i)
+				for (var i:uint = 0; i < this._buttonLabels.length; ++i)
 				{
-					var button:Sprite = this.getButton(buttonLabels[i], bgWidth - (MARGIN * 2), buttonHeight);
+					var button:Sprite = this.getButton(this._buttonLabels[i], bgWidth - (MARGIN * 2), buttonHeight);
 					button.x = (bgWidth / 2) - (button.width / 2);
 					button.y = buttonY;
 					box.addChild(button);
@@ -128,6 +145,7 @@ package com.christiancantrell.components
 		{
 			this.removeEventListener(MouseEvent.CLICK, onClick);
 			this._stage.removeChild(this);
+			this._stage.removeEventListener(Event.RESIZE, doLayout);
 			this.dispatchEvent(new AlertEvent());
 		}
 		
@@ -135,6 +153,7 @@ package com.christiancantrell.components
 		{
 			e.stopPropagation();
 			this._stage.removeChild(this);
+			this._stage.removeEventListener(Event.RESIZE, doLayout);
 			var button:Sprite = e.target as Sprite;
 			var label:Label = button.getChildAt(0) as Label;
 			var ae:AlertEvent = new AlertEvent();

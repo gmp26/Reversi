@@ -10,8 +10,8 @@ package
 	import flash.display.Sprite;
 	import flash.events.Event;
 	import flash.events.MouseEvent;
+	import flash.filters.BevelFilter;
 	import flash.filters.GlowFilter;
-	import flash.geom.Point;
 	import flash.system.Capabilities;
 	
 	public class Reversi extends Sprite
@@ -47,6 +47,7 @@ package
 		private var whiteScore:uint;
 		private var turnGlow:GlowFilter;
 		private var ppi:uint;
+		private var stoneBevel:BevelFilter;
 		
 		public function Reversi()
 		{
@@ -78,6 +79,7 @@ package
 			var titleSize:uint = Ruler.mmToPixels(7, this.ppi);
 			this.title = new Label(TITLE, "bold", TITLE_COLOR, "_sans", titleSize);
 			this.turnGlow = new GlowFilter(TURN_GLOW, 1, 10, 10);
+			this.stoneBevel = new BevelFilter(2, 20);
 		}
 		
 		public function doLayout(e:Event):void
@@ -140,17 +142,19 @@ package
 			this.addChild(this.board);
 			this.placeStones();
 			this.board.addEventListener(MouseEvent.CLICK, onBoardClicked);
-			
-			// Scores
-			var scoreSize:uint = (this.getOrientation() == PORTRAIT) ? Ruler.mmToPixels(this.ppi, 25) : Ruler.mmToPixels(this.ppi, 35);
-			this.blackScoreLabel = new Label(String(this.blackScore), "normal", BLACK_COLOR, "_sans", scoreSize);
-			this.whiteScoreLabel = new Label(String(this.whiteScore), "normal", WHITE_COLOR, "_sans", scoreSize);
 
 			this.title.y = 22;
-			var gutterWidth:uint, gutterHeight:uint;
+			var gutterWidth:uint, gutterHeight:uint, scoreSize:uint;
 			var newGameButton:Button, buttonWidth:Number, buttonHeight:Number;
 			if (this.getOrientation() == PORTRAIT) // Portrait
 			{
+				gutterHeight = (stageHeight - boardSize) / 2;
+
+				// Scores
+				scoreSize = gutterHeight * .6;;
+				this.blackScoreLabel = new Label(String(this.blackScore), "normal", BLACK_COLOR, "_sans", scoreSize);
+				this.whiteScoreLabel = new Label(String(this.whiteScore), "normal", WHITE_COLOR, "_sans", scoreSize);
+
 				Layout.centerHorizontally(this.title, this.stage);
 				this.alignScores();
 
@@ -178,6 +182,13 @@ package
 			else // Landscape
 			{
 				gutterWidth = (stageWidth - boardSize) / 2;
+				gutterHeight = stageHeight;
+
+				// Scores
+				scoreSize = gutterHeight * .3;
+				this.blackScoreLabel = new Label(String(this.blackScore), "normal", BLACK_COLOR, "_sans", scoreSize);
+				this.whiteScoreLabel = new Label(String(this.whiteScore), "normal", WHITE_COLOR, "_sans", scoreSize);
+				
 				this.title.x = (boardX / 2) - (this.title.width / 2);
 
 				buttonWidth = gutterWidth - 10;
@@ -308,7 +319,6 @@ package
 		
 		private function saveHistory():void
 		{
-			trace("in save history");
 			++this.historyIndex;
 			this.history[this.historyIndex] = this.deepCopyStoneArray(this.stones);
 			for (var i:uint = this.historyIndex + 1; i < 64; ++i)
@@ -344,6 +354,7 @@ package
 			stone.graphics.beginFill((color == WHITE) ? WHITE_COLOR : BLACK_COLOR);
 			stone.graphics.drawCircle(stoneSize/2, stoneSize/2, stoneSize/2);
 			stone.graphics.endFill();
+			stone.filters = [this.stoneBevel];
 			stone.x = (x * cellSize) + 1;
 			stone.y = (y * cellSize) + 1;
 			this.board.addChild(stone);
@@ -470,7 +481,7 @@ package
 				return;
 			}
 			
-			if (this.isNextMovePossible())
+			if (this.isNextMovePossible(!this.turn))
 			{
 				this.changeTurn();
 				return;
@@ -484,6 +495,13 @@ package
 				allStonesCapturedAlert.show(nonZeroPlayer + " Wins!", nonZeroPlayer + " has captured all of " + zeroPlayer + "'s stones. Well done, " + nonZeroPlayer + "!");
 				return;
 			}
+			else if (this.isNextMovePossible(this.turn)) // Neither player can make a move. Unusual, but possible.
+			{
+				var noMoreMovesAlert:Alert = new Alert(this.stage, this.ppi);
+				var defaultWinner:String = (this.blackScore > this.whiteScore) ? BLACK_COLOR_NAME : WHITE_COLOR_NAME;
+				noMoreMovesAlert.show(defaultWinner + " Wins!", "Neither player can make a move, therefore the game is over and " + defaultWinner + " wins!");
+				return;
+			}
 			else // Game isn't over, but opponent can't place a stone.
 			{
 				var noNextMoveAlert:Alert = new Alert(this.stage, this.ppi);
@@ -493,7 +511,7 @@ package
 			}
 		}
 		
-		private function isNextMovePossible():Boolean
+		private function isNextMovePossible(player:Boolean):Boolean
 		{
 			var capturesFound:Boolean = false;
 			for (var x:uint = 0; x < 8; ++x)
@@ -501,7 +519,7 @@ package
 				for (var y:uint = 0; y < 8; ++y)
 				{
 					if (this.stones[x][y] != null) continue;
-					if (this.findCaptures(!this.turn, x, y, false)) return true;
+					if (this.findCaptures(player, x, y, false)) return true;
 				}
 			}
 			return capturesFound;
