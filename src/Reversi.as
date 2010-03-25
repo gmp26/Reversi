@@ -4,7 +4,6 @@ package
 	import com.christiancantrell.components.AlertEvent;
 	import com.christiancantrell.components.Button;
 	import com.christiancantrell.components.Label;
-	import com.christiancantrell.pieces.Board;
 	import com.christiancantrell.utils.Layout;
 	import com.christiancantrell.utils.Ruler;
 	
