@@ -4,7 +4,6 @@ package
 	import com.christiancantrell.components.AlertEvent;
 	import com.christiancantrell.components.Button;
 	import com.christiancantrell.components.Label;
-	import com.christiancantrell.models.Turn;
 	import com.christiancantrell.pieces.Board;
 	import com.christiancantrell.utils.Layout;
 	import com.christiancantrell.utils.Ruler;
@@ -41,6 +40,7 @@ package
 		private var turn:Boolean;
 		private var pieces:Vector.<Sprite>;
 		private var history:Array;
+		private var historyIndex:int;
 		private var title:Label;
 		private var blackScoreLabel:Label, whiteScoreLabel:Label;
 		private var backButton:Button, nextButton:Button;
@@ -60,8 +60,8 @@ package
 		
 		private function prepareGame():void
 		{
-			this.pieces = new Vector.<Sprite>(64);
-			this.history = new Array();
+			this.history = new Array(64);
+			this.historyIndex = -1;
 			this.initStones();
 			this.turn = BLACK;  // Black always starts
 			this.blackScore = 2;
@@ -85,7 +85,6 @@ package
 		{
 			// Remove any children that have already been added.
 			while (this.numChildren > 0) this.removeChildAt(0);
-			this.pieces = new Vector.<Sprite>(64);
 			
 			var stageWidth:uint = this.stage.stageWidth;
 			var stageHeight:uint = this.stage.stageHeight;
@@ -203,6 +202,7 @@ package
 				this.nextButton.y = (stageHeight - this.nextButton.height) - 5;
 				this.addChild(this.nextButton);
 			}
+			this.evaluateButtons();
 			this.addChild(title);
 			this.alignScores();
 			this.addChild(this.blackScoreLabel);
@@ -256,15 +256,20 @@ package
 		
 		private function onBack(e:MouseEvent):void
 		{
-			if (this.history.length == 0) return;
-			var turn:Turn = this.history.pop();
-			this.stones[turn.x][turn.y] = null;
-			this.findCaptures(!turn.player, turn.x, turn.y, true);
+			if (this.historyIndex == 0) return;
+			--this.historyIndex;
+			this.stones = this.deepCopyStoneArray(this.history[this.historyIndex]);
+			this.placeStones();
+			this.onTurnFinished();
 		}
 		
 		private function onNext(e:MouseEvent):void
 		{
-			
+			if (this.history[this.historyIndex+1] == null) return;
+			++this.historyIndex;
+			this.stones = this.deepCopyStoneArray(this.history[this.historyIndex]);
+			this.placeStones();
+			this.onTurnFinished();
 		}
 		
 		private function onNewGameButtonClicked(e:MouseEvent):void
@@ -280,11 +285,11 @@ package
 			alert.removeEventListener(AlertEvent.ALERT_CLICKED, onNewGameConfirm);
 			if (e.label == "Yes")
 			{
-				while (this.board.numChildren > 0) this.board.removeChildAt(0);
 				this.prepareGame();
 				this.placeStones();
 				this.changeTurnIndicator();
 				this.calculateScore();
+				this.evaluateButtons();
 			}
 		}
 		
@@ -299,10 +304,24 @@ package
 			this.stones[4][4] = WHITE;
 			this.stones[4][3] = BLACK;
 			this.stones[3][4] = BLACK;
+			this.saveHistory();
+		}
+		
+		private function saveHistory():void
+		{
+			trace("in save history");
+			++this.historyIndex;
+			this.history[this.historyIndex] = this.deepCopyStoneArray(this.stones);
+			for (var i:uint = this.historyIndex + 1; i < 64; ++i)
+			{
+				this.history[i] = null;
+			}
 		}
 		
 		private function placeStones():void
 		{
+			this.pieces = new Vector.<Sprite>(64);
+			while (this.board.numChildren > 0) this.board.removeChildAt(0);
 			var cellSize:Number = (this.board.width / 8); 
 			var stoneSize:Number = cellSize - 2;
 			for (var x:uint = 0; x < 8; ++x)
@@ -317,15 +336,11 @@ package
 		
 		private function placeStone(color:Boolean, x:uint, y:uint):void
 		{
-			var index:uint = (y * 8) + x;
 			var cellSize:Number = (this.board.width / 8); 
 			var stoneSize:Number = cellSize - 2;
-			if (this.pieces[index] != null)
-			{
-				this.board.removeChild(Sprite(this.pieces[index]));
-			}
+			this.removePieceFromBoard(x, y);
 			var stone:Sprite = new Sprite();
-			this.pieces[index] = stone;
+			this.pieces[this.coordinatesToIndex(x, y)] = stone;
 			stone.mouseEnabled = false;
 			stone.graphics.beginFill((color == WHITE) ? WHITE_COLOR : BLACK_COLOR);
 			stone.graphics.drawCircle(stoneSize/2, stoneSize/2, stoneSize/2);
@@ -333,6 +348,20 @@ package
 			stone.x = (x * cellSize) + 1;
 			stone.y = (y * cellSize) + 1;
 			this.board.addChild(stone);
+		}
+		
+		private function removePieceFromBoard(x:uint, y:uint):void
+		{
+			var index:uint = this.coordinatesToIndex(x, y);
+			if (this.pieces[index] != null)
+			{
+				this.board.removeChild(Sprite(this.pieces[index]));
+			}
+		}
+		
+		private function coordinatesToIndex(x:uint, y:uint):uint
+		{
+			return (y * 8) + x;
 		}
 		
 		private function onBoardClicked(e:MouseEvent):void
@@ -344,9 +373,22 @@ package
 			if (!this.findCaptures(this.turn, x, y, true)) return;
 			this.placeStone(this.turn, x, y);
 			this.stones[x][y] = this.turn;
-			var turn:Turn = new Turn(x, y, this.turn);
-			this.history.push(turn);
+			this.saveHistory();
 			this.onTurnFinished();
+		}
+		
+		private function deepCopyStoneArray(stoneArray:Array):Array
+		{
+			var newStones:Array = new Array(8);
+			for (var x:uint = 0; x < 8; ++x)
+			{
+				newStones[x] = new Array(8);
+				for (var y:uint = 0; y < 8; ++y)
+				{
+					if (stoneArray[x][y] != null) newStones[x][y] = stoneArray[x][y];
+				}
+			}
+			return newStones;
 		}
 		
 		private function findCaptures(turn:Boolean, x:uint, y:uint, turnStones:Boolean):Boolean
@@ -420,6 +462,7 @@ package
 		private function onTurnFinished():void
 		{
 			this.calculateScore();
+			this.evaluateButtons();
 			if ((this.blackScore + this.whiteScore) == 64) // All stomes played. Game is over.
 			{
 				var allStonesPlayedAlert:Alert = new Alert(this.stage, this.ppi);
@@ -442,7 +485,7 @@ package
 				allStonesCapturedAlert.show(nonZeroPlayer + " Wins!", nonZeroPlayer + " has captured all of " + zeroPlayer + "'s stones. Well done, " + nonZeroPlayer + "!");
 				return;
 			}
-			else // Game isn't over, but opponent can't place stone.
+			else // Game isn't over, but opponent can't place a stone.
 			{
 				var noNextMoveAlert:Alert = new Alert(this.stage, this.ppi);
 				var side:String = (this.turn == WHITE) ? BLACK_COLOR_NAME : WHITE_COLOR_NAME;
@@ -483,6 +526,12 @@ package
 				this.blackScoreLabel.filters = [this.turnGlow];
 				this.whiteScoreLabel.filters = null;
 			}
+		}
+		
+		private function evaluateButtons():void
+		{
+			this.backButton.enabled = (this.historyIndex == 0) ? false : true;
+			this.nextButton.enabled = (this.history[this.historyIndex+1] == null) ? false : true;
 		}
 		
 		private function calculateScore():void
