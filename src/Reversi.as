@@ -49,10 +49,10 @@ package
 		private var ppi:uint;
 		private var stoneBevel:BevelFilter;
 		
-		public function Reversi()
+		public function Reversi(ppi:int = -1)
 		{
 			super();
-			this.ppi = Capabilities.screenDPI;
+			this.ppi = (ppi == -1) ? Capabilities.screenDPI : ppi;
 			this.prepareGame();
 			this.initUIComponents();
 			this.addEventListener(Event.ADDED, onAddedToDisplayList);
@@ -78,7 +78,7 @@ package
 		{
 			var titleSize:uint = Ruler.mmToPixels(7, this.ppi);
 			this.title = new Label(TITLE, "bold", TITLE_COLOR, "_sans", titleSize);
-			this.turnGlow = new GlowFilter(TURN_GLOW, 1, 10, 10);
+			this.turnGlow = new GlowFilter(TURN_GLOW, 1, 10, 10, 10);
 			this.stoneBevel = new BevelFilter(2, 20);
 		}
 		
@@ -189,7 +189,7 @@ package
 				this.blackScoreLabel = new Label(String(this.blackScore), "normal", BLACK_COLOR, "_sans", scoreSize);
 				this.whiteScoreLabel = new Label(String(this.whiteScore), "normal", WHITE_COLOR, "_sans", scoreSize);
 				
-				this.title.x = (boardX / 2) - (this.title.width / 2);
+				this.title.x = ((boardX / 2) - (this.title.width / 2) - 4);
 
 				buttonWidth = gutterWidth - 10;
 				buttonHeight = Ruler.mmToPixels(10, this.ppi);
@@ -232,10 +232,10 @@ package
 			}
 			else
 			{
-				this.blackScoreLabel.y = (gutterDimensions.height / 2) + (this.blackScoreLabel.textHeight / 2);
+				this.blackScoreLabel.y = ((gutterDimensions.height / 2) + (this.blackScoreLabel.textHeight / 2) + 4);
 				this.blackScoreLabel.x = (gutterDimensions.width / 4) - (this.blackScoreLabel.textWidth / 2);
 				
-				this.whiteScoreLabel.y = (gutterDimensions.height / 2) + (this.whiteScoreLabel.textHeight / 2);
+				this.whiteScoreLabel.y = ((gutterDimensions.height / 2) + (this.whiteScoreLabel.textHeight / 2) + 4);
 				this.whiteScoreLabel.x = (gutterDimensions.width) - ((gutterDimensions.width / 4) + (this.blackScoreLabel.textWidth / 2));
 			}
 		}
@@ -270,7 +270,8 @@ package
 			--this.historyIndex;
 			this.stones = this.deepCopyStoneArray(this.history[this.historyIndex]);
 			this.placeStones();
-			this.onTurnFinished();
+			this.changeTurn();
+			this.onTurnFinished(false);
 		}
 		
 		private function onNext(e:MouseEvent):void
@@ -279,7 +280,8 @@ package
 			++this.historyIndex;
 			this.stones = this.deepCopyStoneArray(this.history[this.historyIndex]);
 			this.placeStones();
-			this.onTurnFinished();
+			this.changeTurn();
+			this.onTurnFinished(false);
 		}
 		
 		private function onNewGameButtonClicked(e:MouseEvent):void
@@ -384,7 +386,7 @@ package
 			this.placeStone(this.turn, x, y);
 			this.stones[x][y] = this.turn;
 			this.saveHistory();
-			this.onTurnFinished();
+			this.onTurnFinished(true);
 		}
 		
 		private function deepCopyStoneArray(stoneArray:Array):Array
@@ -469,21 +471,22 @@ package
 			}
 		}
 		
-		private function onTurnFinished():void
+		private function onTurnFinished(changeTurns:Boolean):void
 		{
 			this.calculateScore();
 			this.evaluateButtons();
+
+			if (this.isNextMovePossible(!this.turn))
+			{
+				if (changeTurns) this.changeTurn();
+				return;
+			}
+
 			if ((this.blackScore + this.whiteScore) == 64) // All stomes played. Game is over.
 			{
 				var allStonesPlayedAlert:Alert = new Alert(this.stage, this.ppi);
 				var winner:String = (this.blackScore > this.whiteScore) ? BLACK_COLOR_NAME : WHITE_COLOR_NAME;
 				allStonesPlayedAlert.show(winner + " Wins!", "All stones have been played, so the game is over. Well done, " + winner + "!");
-				return;
-			}
-			
-			if (this.isNextMovePossible(!this.turn))
-			{
-				this.changeTurn();
 				return;
 			}
 			
@@ -495,25 +498,24 @@ package
 				allStonesCapturedAlert.show(nonZeroPlayer + " Wins!", nonZeroPlayer + " has captured all of " + zeroPlayer + "'s stones. Well done, " + nonZeroPlayer + "!");
 				return;
 			}
-			else if (this.isNextMovePossible(this.turn)) // Neither player can make a move. Unusual, but possible.
+			
+			if (!this.isNextMovePossible(this.turn)) // Neither player can make a move. Unusual, but possible.
 			{
 				var noMoreMovesAlert:Alert = new Alert(this.stage, this.ppi);
 				var defaultWinner:String = (this.blackScore > this.whiteScore) ? BLACK_COLOR_NAME : WHITE_COLOR_NAME;
 				noMoreMovesAlert.show(defaultWinner + " Wins!", "Neither player can make a move, therefore the game is over and " + defaultWinner + " wins!");
 				return;
 			}
-			else // Game isn't over, but opponent can't place a stone.
-			{
-				var noNextMoveAlert:Alert = new Alert(this.stage, this.ppi);
-				var side:String = (this.turn == WHITE) ? BLACK_COLOR_NAME : WHITE_COLOR_NAME;
-				var otherSide:String = (this.turn != WHITE) ? BLACK_COLOR_NAME : WHITE_COLOR_NAME;
-				noNextMoveAlert.show("No Move Available", side + " has no possible moves, and therefore must pass. It's still " + otherSide + "'s turn.");
-			}
+
+			// Game isn't over, but opponent can't place a stone.
+			var noNextMoveAlert:Alert = new Alert(this.stage, this.ppi);
+			var side:String = (this.turn == WHITE) ? BLACK_COLOR_NAME : WHITE_COLOR_NAME;
+			var otherSide:String = (this.turn != WHITE) ? BLACK_COLOR_NAME : WHITE_COLOR_NAME;
+			noNextMoveAlert.show("No Move Available", side + " has no possible moves, and therefore must pass. It's still " + otherSide + "'s turn.");
 		}
 		
 		private function isNextMovePossible(player:Boolean):Boolean
 		{
-			var capturesFound:Boolean = false;
 			for (var x:uint = 0; x < 8; ++x)
 			{
 				for (var y:uint = 0; y < 8; ++y)
@@ -522,7 +524,7 @@ package
 					if (this.findCaptures(player, x, y, false)) return true;
 				}
 			}
-			return capturesFound;
+			return false;
 		}
 		
 		private function changeTurn():void
