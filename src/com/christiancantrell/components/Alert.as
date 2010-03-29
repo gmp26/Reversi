@@ -14,13 +14,15 @@ package com.christiancantrell.components
 	[Event(name=AlertEvent.ALERT_CLICKED, type="com.christiancantrell.components.AlertEvent")]
 	public class Alert extends Sprite
 	{
-		private const BACKGROUND_COLOR:uint   = 0x0000ff;
-		private const BACKGROUND_ALPHA:Number = .85;
-		private const BORDER_COLOR:uint       = 0xffffff;
-		private const MODAL_COLOR:uint        = 0x000000;
-		private const FONT_COLOR:uint         = 0xffffff;
-		private const CORNER:uint             = 20;
-		private const MARGIN:uint             = 15;
+		private const BACKGROUND_COLOR:uint        = 0x0198e1;
+		private const BACKGROUND_ALPHA:Number      = .85;
+		private const BORDER_COLOR:uint            = 0xffffff;
+		private const BUTTON_BORDER_COLOR:uint     = 0xffffff;
+		private const BUTTON_BACKGROUND_COLOR:uint = 0x0198e1;
+		private const MODAL_COLOR:uint             = 0x000000;
+		private const FONT_COLOR:uint              = 0xffffff;
+		private const CORNER:uint                  = 0;
+		private const MARGIN:uint                  = 15;
 		
 		private var _stage:Stage;
 		private var _ppi:uint;
@@ -128,10 +130,10 @@ package com.christiancantrell.components
 		private function getButton(buttonLabel:String, width:uint, height:uint):Sprite
 		{
 			var button:Sprite = new Sprite();
-			button.graphics.beginFill(BACKGROUND_COLOR, BACKGROUND_ALPHA - .25);
+			button.graphics.beginFill(BUTTON_BACKGROUND_COLOR, BACKGROUND_ALPHA - .25);
 			button.graphics.drawRoundRect(0, 0, width, height, CORNER, CORNER);
 			button.graphics.endFill();
-			button.graphics.lineStyle(2, BORDER_COLOR, 1, true, "normal", CapsStyle.NONE);
+			button.graphics.lineStyle(2, BUTTON_BORDER_COLOR, 1, true, "normal", CapsStyle.NONE);
 			button.graphics.drawRoundRect(0, 0, width, height, CORNER, CORNER);
 			var label:Label = new Label(buttonLabel, "normal", FONT_COLOR);
 			Layout.center(label, button);

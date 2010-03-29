@@ -2,37 +2,40 @@ package
 {
 	import com.christiancantrell.components.Alert;
 	import com.christiancantrell.components.AlertEvent;
-	import com.christiancantrell.components.Button;
 	import com.christiancantrell.components.Label;
+	import com.christiancantrell.components.TextButton;
 	import com.christiancantrell.utils.Layout;
 	import com.christiancantrell.utils.Ruler;
 	
+	import flash.display.GradientType;
+	import flash.display.InterpolationMethod;
+	import flash.display.SpreadMethod;
 	import flash.display.Sprite;
 	import flash.events.Event;
 	import flash.events.MouseEvent;
 	import flash.filters.BevelFilter;
-	import flash.filters.GlowFilter;
+	import flash.filters.BlurFilter;
+	import flash.filters.DropShadowFilter;
+	import flash.geom.Matrix;
 	import flash.system.Capabilities;
 	
 	public class Reversi extends Sprite
 	{
 		private const WHITE_COLOR:uint        = 0xffffff;
 		private const WHITE_COLOR_NAME:String = "White";
-		private const BLACK_COLOR:uint        = 0xff0000;
-		private const BLACK_COLOR_NAME:String = "Red";
-		private const BOARD_COLOR:uint        = 0x000000;
-		private const BOARD_LINES:uint        = 0xffffff;
+		private const BLACK_COLOR:uint        = 0x000000;
+		private const BLACK_COLOR_NAME:String = "Black";
+		private const BOARD_COLORS:Array      = [0x666666, 0x333333];
+		private const BOARD_LINES:uint        = 0x666666;
 		private const BACKGROUND_COLOR:uint   = 0x666666;
 		private const TITLE_COLOR:uint        = 0xffffff;
-		private const TURN_GLOW:uint          = 0x0000ff;
-		
+		private const TURN_GLOW_COLORS:Array  = [0xffffff, 0x000000];
 		private const TITLE:String = "Reversi";
-		
 		private const WHITE:Boolean = true;
 		private const BLACK:Boolean = false;
-		
 		private const PORTRAIT:String = "portrait";
 		private const LANDSCAPE:String = "landscape";
+		private const CACHE_AS_BITMAP:Boolean = true;
 		
 		private var board:Sprite;
 		private var stones:Array;
@@ -42,12 +45,14 @@ package
 		private var historyIndex:int;
 		private var title:Label;
 		private var blackScoreLabel:Label, whiteScoreLabel:Label;
-		private var backButton:Button, nextButton:Button;
+		private var backButton:TextButton, nextButton:TextButton;
 		private var blackScore:uint;
 		private var whiteScore:uint;
-		private var turnGlow:GlowFilter;
+		private var turnFilter:BlurFilter;
 		private var ppi:uint;
 		private var stoneBevel:BevelFilter;
+		private var boardShadow:DropShadowFilter;
+		private var titleShadow:DropShadowFilter;
 		
 		public function Reversi(ppi:int = -1)
 		{
@@ -78,8 +83,11 @@ package
 		{
 			var titleSize:uint = Ruler.mmToPixels(7, this.ppi);
 			this.title = new Label(TITLE, "bold", TITLE_COLOR, "_sans", titleSize);
-			this.turnGlow = new GlowFilter(TURN_GLOW, 1, 10, 10, 10);
-			this.stoneBevel = new BevelFilter(2, 20);
+			this.titleShadow = new DropShadowFilter(0, 90, 0, 1, 10, 10, 1, 1, false, true);
+			this.title.filters = [this.titleShadow];
+			this.turnFilter = new BlurFilter(8, 8, 1);
+			this.stoneBevel = new BevelFilter(1, 45);
+			this.boardShadow = new DropShadowFilter(0, 90, 0, 1, 10, 10, 1, 1);
 		}
 		
 		public function doLayout(e:Event):void
@@ -119,9 +127,12 @@ package
 			this.board.y = boardY;
 			
 			// Draw the board's background
-			this.board.graphics.beginFill(BOARD_COLOR);
+			var matrix:Matrix = new Matrix();
+			matrix.createGradientBox(boardSize, boardSize, 0, 0, 0);
+			this.board.graphics.beginGradientFill(GradientType.RADIAL, BOARD_COLORS, [1, 1], [0, 255], matrix, SpreadMethod.PAD, InterpolationMethod.LINEAR_RGB, 0);
 			this.board.graphics.drawRect(0, 0, boardSize, boardSize);
 			this.board.graphics.endFill();
+			this.board.filters = [this.boardShadow];
 			
 			// Draw cells on board
 			var lineSpace:Number = boardSize / 8;
@@ -143,17 +154,18 @@ package
 			this.placeStones();
 			this.board.addEventListener(MouseEvent.CLICK, onBoardClicked);
 
-			this.title.y = 22;
+			this.title.y = 24;
 			var gutterWidth:uint, gutterHeight:uint, scoreSize:uint;
-			var newGameButton:Button, buttonWidth:Number, buttonHeight:Number;
+			var newGameButton:TextButton, buttonWidth:Number, buttonHeight:Number;
 			if (this.getOrientation() == PORTRAIT) // Portrait
 			{
 				gutterHeight = (stageHeight - boardSize) / 2;
+				gutterWidth = stageWidth;
 
 				// Scores
 				scoreSize = gutterHeight * .6;;
-				this.blackScoreLabel = new Label(String(this.blackScore), "normal", BLACK_COLOR, "_sans", scoreSize);
-				this.whiteScoreLabel = new Label(String(this.whiteScore), "normal", WHITE_COLOR, "_sans", scoreSize);
+				this.blackScoreLabel = new Label(String(this.blackScore), "bold", BLACK_COLOR, "_sans", scoreSize);
+				this.whiteScoreLabel = new Label(String(this.whiteScore), "bold", WHITE_COLOR, "_sans", scoreSize);
 
 				Layout.centerHorizontally(this.title, this.stage);
 				this.alignScores();
@@ -161,22 +173,22 @@ package
 				buttonWidth = stageWidth / 3;
 				buttonHeight = Ruler.mmToPixels(10, this.ppi);
 				
-				this.backButton = new Button("Back", buttonWidth, buttonHeight);
+				this.backButton = new TextButton("BACK", true, buttonWidth, buttonHeight);
 				this.backButton.addEventListener(MouseEvent.CLICK, this.onBack);
-				this.backButton.x = 0;
-				this.backButton.y = (stageHeight - this.backButton.height);
+				this.backButton.x = 2;
+				this.backButton.y = (stageHeight - this.backButton.height) - 1;
 				this.addChild(this.backButton);
 				
-				newGameButton = new Button("New Game", buttonWidth, buttonHeight);
-				newGameButton.x = this.backButton.width;
-				newGameButton.y = (stageHeight - newGameButton.height);
+				newGameButton = new TextButton("NEW", true, buttonWidth - 6, buttonHeight);
+				newGameButton.x = (gutterWidth / 2) - (this.backButton.width / 2) + 3;
+				newGameButton.y = this.backButton.y;
 				newGameButton.addEventListener(MouseEvent.CLICK, onNewGameButtonClicked);
 				this.addChild(newGameButton);
 				
-				this.nextButton = new Button("Next", buttonWidth, buttonHeight);
+				this.nextButton = new TextButton("NEXT", true, buttonWidth, buttonHeight);
 				this.nextButton.addEventListener(MouseEvent.CLICK, this.onNext);
-				this.nextButton.x = newGameButton.x + newGameButton.width;
-				this.nextButton.y = (stageHeight - this.nextButton.height);
+				this.nextButton.x = gutterWidth - this.nextButton.width - 2;
+				this.nextButton.y = newGameButton.y;
 				this.addChild(this.nextButton);
 			}
 			else // Landscape
@@ -186,27 +198,27 @@ package
 
 				// Scores
 				scoreSize = gutterHeight * .3;
-				this.blackScoreLabel = new Label(String(this.blackScore), "normal", BLACK_COLOR, "_sans", scoreSize);
-				this.whiteScoreLabel = new Label(String(this.whiteScore), "normal", WHITE_COLOR, "_sans", scoreSize);
+				this.blackScoreLabel = new Label(String(this.blackScore), "bold", BLACK_COLOR, "_sans", scoreSize);
+				this.whiteScoreLabel = new Label(String(this.whiteScore), "bold", WHITE_COLOR, "_sans", scoreSize);
 				
 				this.title.x = ((boardX / 2) - (this.title.width / 2) - 4);
 
 				buttonWidth = gutterWidth - 10;
 				buttonHeight = Ruler.mmToPixels(10, this.ppi);
 
-				newGameButton = new Button("New Game", buttonWidth, buttonHeight);
+				newGameButton = new TextButton("NEW", false, buttonWidth, buttonHeight);
 				newGameButton.x = (stageWidth - gutterWidth) + ((gutterWidth - newGameButton.width) / 2);
 				newGameButton.y = 5;
 				newGameButton.addEventListener(MouseEvent.CLICK, onNewGameButtonClicked);
 				this.addChild(newGameButton);
 
-				this.backButton = new Button("Back", buttonWidth, buttonHeight);
+				this.backButton = new TextButton("BACK", false, buttonWidth, buttonHeight);
 				this.backButton.addEventListener(MouseEvent.CLICK, this.onBack);
 				this.backButton.x = (gutterWidth - this.backButton.width) / 2;
 				this.backButton.y = (stageHeight - this.backButton.height) - 5;
 				this.addChild(this.backButton);
 				
-				this.nextButton = new Button("Next", buttonWidth, buttonHeight);
+				this.nextButton = new TextButton("NEXT", false, buttonWidth, buttonHeight);
 				this.nextButton.addEventListener(MouseEvent.CLICK, this.onNext);
 				this.nextButton.x = newGameButton.x;
 				this.nextButton.y = (stageHeight - this.nextButton.height) - 5;
@@ -233,10 +245,10 @@ package
 			else
 			{
 				this.blackScoreLabel.y = ((gutterDimensions.height / 2) + (this.blackScoreLabel.textHeight / 2) + 4);
-				this.blackScoreLabel.x = (gutterDimensions.width / 4) - (this.blackScoreLabel.textWidth / 2);
+				this.blackScoreLabel.x = ((gutterDimensions.width / 4) - (this.blackScoreLabel.textWidth / 2) - 4);
 				
 				this.whiteScoreLabel.y = ((gutterDimensions.height / 2) + (this.whiteScoreLabel.textHeight / 2) + 4);
-				this.whiteScoreLabel.x = (gutterDimensions.width) - ((gutterDimensions.width / 4) + (this.blackScoreLabel.textWidth / 2));
+				this.whiteScoreLabel.x = ((gutterDimensions.width) - ((gutterDimensions.width / 4) + (this.blackScoreLabel.textWidth / 2)) + 4);
 			}
 		}
 		
@@ -343,6 +355,7 @@ package
 					this.placeStone(this.stones[x][y], x, y);
 				}
 			}
+			this.board.cacheAsBitmap = CACHE_AS_BITMAP;
 		}
 		
 		private function placeStone(color:Boolean, x:uint, y:uint):void
@@ -537,13 +550,13 @@ package
 		{
 			if (this.turn == WHITE)
 			{
-				this.whiteScoreLabel.filters = [this.turnGlow];
-				this.blackScoreLabel.filters = null;
+				this.whiteScoreLabel.filters = null;
+				this.blackScoreLabel.filters = [this.turnFilter];
 			}
 			else
 			{
-				this.blackScoreLabel.filters = [this.turnGlow];
-				this.whiteScoreLabel.filters = null;
+				this.blackScoreLabel.filters = null;
+				this.whiteScoreLabel.filters = [this.turnFilter];
 			}
 		}
 		
