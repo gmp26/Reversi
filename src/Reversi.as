@@ -4,6 +4,7 @@ package
 	import com.christiancantrell.components.AlertEvent;
 	import com.christiancantrell.components.Label;
 	import com.christiancantrell.components.TextButton;
+	import com.christiancantrell.data.HistoryEntry;
 	import com.christiancantrell.utils.Layout;
 	import com.christiancantrell.utils.Ruler;
 	
@@ -35,6 +36,12 @@ package
 		private const BLACK:Boolean = false;
 		private const PORTRAIT:String = "portrait";
 		private const LANDSCAPE:String = "landscape";
+		private const SINGLE_PLAYER_MODE:String = "singlePlayerMode";
+		private const SINGLE_PLAYER_STRING:String = "Single Player Game";
+		private const TWO_PLAYER_MODE:String = "twoPlayerMode";
+		private const TWO_PLAYER_STRING:String = "Two Player Game";
+		private const CANCEL_STRING:String = "Cancel";
+		private const COMPUTER_COLOR_STRING:String = "Computer Plays ";
 		private const CACHE_AS_BITMAP:Boolean = true;
 		
 		private var board:Sprite;
@@ -53,22 +60,26 @@ package
 		private var stoneBevel:BevelFilter;
 		private var boardShadow:DropShadowFilter;
 		private var titleShadow:DropShadowFilter;
+		private var playerMode:String;
+		private var computerColor:Boolean;
 		
 		public function Reversi(ppi:int = -1)
 		{
 			super();
 			this.ppi = (ppi == -1) ? Capabilities.screenDPI : ppi;
 			this.prepareGame();
+			this.playerMode = SINGLE_PLAYER_MODE;
+			this.computerColor = WHITE;
 			this.initUIComponents();
 			this.addEventListener(Event.ADDED, onAddedToDisplayList);
 		}
 		
 		private function prepareGame():void
 		{
-			this.history = new Array(64);
+			this.history = new Array(60);
 			this.historyIndex = -1;
-			this.initStones();
 			this.turn = BLACK;  // Black always starts
+			this.initStones();
 			this.blackScore = 2;
 			this.whiteScore = 2;
 		}
@@ -129,7 +140,7 @@ package
 			// Draw the board's background
 			var matrix:Matrix = new Matrix();
 			matrix.createGradientBox(boardSize, boardSize, 0, 0, 0);
-			this.board.graphics.beginGradientFill(GradientType.RADIAL, BOARD_COLORS, [1, 1], [0, 255], matrix, SpreadMethod.PAD, InterpolationMethod.LINEAR_RGB, 0);
+			this.board.graphics.beginGradientFill(GradientType.RADIAL, BOARD_COLORS, [1, 1], [0, 255], matrix, SpreadMethod.PAD, InterpolationMethod.RGB, 0);
 			this.board.graphics.drawRect(0, 0, boardSize, boardSize);
 			this.board.graphics.endFill();
 			this.board.filters = [this.boardShadow];
@@ -280,41 +291,68 @@ package
 		{
 			if (this.historyIndex == 0) return;
 			--this.historyIndex;
-			this.stones = this.deepCopyStoneArray(this.history[this.historyIndex]);
+			var historyEntry:HistoryEntry = this.history[this.historyIndex] as HistoryEntry;
+			this.stones = this.deepCopyStoneArray(historyEntry.board);
+			this.turn = historyEntry.turn;
 			this.placeStones();
-			this.changeTurn();
-			this.onTurnFinished(false);
+			this.changeTurnIndicator();
+			this.onTurnFinished(false, false);
 		}
 		
 		private function onNext(e:MouseEvent):void
 		{
 			if (this.history[this.historyIndex+1] == null) return;
 			++this.historyIndex;
-			this.stones = this.deepCopyStoneArray(this.history[this.historyIndex]);
+			var historyEntry:HistoryEntry = this.history[this.historyIndex] as HistoryEntry;
+			this.stones = this.deepCopyStoneArray(historyEntry.board);
+			this.turn = historyEntry.turn;
 			this.placeStones();
-			this.changeTurn();
-			this.onTurnFinished(false);
+			this.changeTurnIndicator();
+			this.onTurnFinished(false, false);
 		}
 		
 		private function onNewGameButtonClicked(e:MouseEvent):void
 		{
 			var alert:Alert = new Alert(this.stage, this.ppi);
 			alert.addEventListener(AlertEvent.ALERT_CLICKED, onNewGameConfirm);
-			alert.show("Confirm", "Are you sure you want to start a new game?", ["Yes", "No"]);
+			alert.show	("Confirm", "Do you want to start a new game?", [SINGLE_PLAYER_STRING, TWO_PLAYER_STRING, CANCEL_STRING]);
 		}
 		
 		private function onNewGameConfirm(e:AlertEvent):void
 		{
 			var alert:Alert = e.target as Alert;
 			alert.removeEventListener(AlertEvent.ALERT_CLICKED, onNewGameConfirm);
-			if (e.label == "Yes")
+			if (e.label == CANCEL_STRING) return;
+			if (e.label == TWO_PLAYER_STRING)
 			{
+				this.playerMode = TWO_PLAYER_MODE;
 				this.prepareGame();
 				this.placeStones();
 				this.changeTurnIndicator();
 				this.calculateScore();
 				this.evaluateButtons();
 			}
+			else
+			{
+				var newAlert:Alert = new Alert(this.stage, this.ppi);
+				newAlert.addEventListener(AlertEvent.ALERT_CLICKED, onComputerColorChosen);
+				newAlert.show("Choose a Color",
+							  "Choose a color for the computer. Remember, " + BLACK_COLOR_NAME + " always goes first.",
+							  [COMPUTER_COLOR_STRING + WHITE_COLOR_NAME, COMPUTER_COLOR_STRING + BLACK_COLOR_NAME, CANCEL_STRING]);
+			}
+		}
+		
+		private function onComputerColorChosen(e:AlertEvent):void
+		{
+			if (e.label == CANCEL_STRING) return;
+			this.playerMode = SINGLE_PLAYER_MODE;
+			this.computerColor = (e.label == COMPUTER_COLOR_STRING + WHITE_COLOR_NAME) ? WHITE : BLACK;
+			this.prepareGame();
+			this.placeStones();
+			this.changeTurnIndicator();
+			this.calculateScore();
+			this.evaluateButtons();
+			if (this.computerColor == BLACK) this.onStartComputerMove();
 		}
 		
 		private function initStones():void
@@ -334,7 +372,10 @@ package
 		private function saveHistory():void
 		{
 			++this.historyIndex;
-			this.history[this.historyIndex] = this.deepCopyStoneArray(this.stones);
+			var historyEntry:HistoryEntry = new HistoryEntry();
+			historyEntry.board = this.deepCopyStoneArray(this.stones);
+			historyEntry.turn = this.turn;
+			this.history[this.historyIndex] = historyEntry;
 			for (var i:uint = this.historyIndex + 1; i < 64; ++i)
 			{
 				this.history[i] = null;
@@ -391,15 +432,24 @@ package
 		
 		private function onBoardClicked(e:MouseEvent):void
 		{
+			if (this.playerMode == SINGLE_PLAYER_MODE && this.turn == this.computerColor) return;
 			var scaleFactor:uint = this.board.width / 8;
 			var x:uint = e.localX / scaleFactor;
 			var y:uint = e.localY / scaleFactor;
+			this.makeMove(x, y);
+			if (this.playerMode == SINGLE_PLAYER_MODE && this.turn == this.computerColor)
+			{
+				this.onStartComputerMove();
+			}
+		}
+		
+		private function makeMove(x:uint, y:uint):void
+		{
 			if (this.stones[x][y] != null) return;
-			if (!this.findCaptures(this.turn, x, y, true)) return;
+			if (this.findCaptures(this.turn, x, y, true) == 0) return;
 			this.placeStone(this.turn, x, y);
 			this.stones[x][y] = this.turn;
-			this.saveHistory();
-			this.onTurnFinished(true);
+			this.onTurnFinished(true, true);
 		}
 		
 		private function deepCopyStoneArray(stoneArray:Array):Array
@@ -416,31 +466,32 @@ package
 			return newStones;
 		}
 		
-		private function findCaptures(turn:Boolean, x:uint, y:uint, turnStones:Boolean):Boolean
+		private function findCaptures(turn:Boolean, x:uint, y:uint, turnStones:Boolean):uint
 		{
-			var topLeft:Boolean     = this.walkPath(turn, x, y, -1, -1, turnStones); // top left
-			var top:Boolean         = this.walkPath(turn, x, y,  0, -1, turnStones); // top
-			var topRight:Boolean    = this.walkPath(turn, x, y,  1, -1, turnStones); // top right
-			var right:Boolean       = this.walkPath(turn, x, y,  1,  0, turnStones); // right
-			var bottomRight:Boolean = this.walkPath(turn, x, y,  1,  1, turnStones); // bottom right
-			var bottom:Boolean      = this.walkPath(turn, x, y,  0,  1, turnStones); // bottom
-			var bottomLeft:Boolean  = this.walkPath(turn, x, y, -1, +1, turnStones); // bottom left
-			var left:Boolean        = this.walkPath(turn, x, y, -1,  0, turnStones); // left
-			return (topLeft || top || topRight || right || bottomRight || bottom || bottomLeft || left) ? true : false;
+			if (this.stones[x][y] != null) return 0;
+			var topLeft:uint     = this.walkPath(turn, x, y, -1, -1, turnStones); // top left
+			var top:uint         = this.walkPath(turn, x, y,  0, -1, turnStones); // top
+			var topRight:uint    = this.walkPath(turn, x, y,  1, -1, turnStones); // top right
+			var right:uint       = this.walkPath(turn, x, y,  1,  0, turnStones); // right
+			var bottomRight:uint = this.walkPath(turn, x, y,  1,  1, turnStones); // bottom right
+			var bottom:uint      = this.walkPath(turn, x, y,  0,  1, turnStones); // bottom
+			var bottomLeft:uint  = this.walkPath(turn, x, y, -1, +1, turnStones); // bottom left
+			var left:uint        = this.walkPath(turn, x, y, -1,  0, turnStones); // left
+			return (topLeft + top + topRight + right + bottomRight + bottom + bottomLeft + left);
 		}
 		
-		private function walkPath(turn:Boolean, x:uint, y:uint, xFactor:int, yFactor:int, turnStones:Boolean):Boolean
+		private function walkPath(turn:Boolean, x:uint, y:uint, xFactor:int, yFactor:int, turnStones:Boolean):uint
 		{
 			// Are we in bounds?
 			if (x + xFactor > 7 || x + xFactor < 0 || y + yFactor > 7 || y + yFactor < 0)
 			{
-				return false;
+				return 0;
 			}
 
 			// Is the next squre empty?
 			if (this.stones[x + xFactor][y + yFactor] == null)
 			{
-				return false;
+				return 0;
 			}
 			
 			var nextStone:Boolean = this.stones[x + xFactor][y + yFactor];
@@ -448,27 +499,29 @@ package
 			// Is the next stone the wrong color?
 			if (nextStone != !turn)
 			{
-				return false;
+				return 0;
 			}
 			
 			// Find the next piece of the same color
 			var tmpX:int = x, tmpY:int = y;
+			var stoneCount:uint = 0;
 			while (true)
 			{
+				++stoneCount;
 				tmpX = tmpX + xFactor;
 				tmpY = tmpY + yFactor;
 				if (tmpX < 0 || tmpY < 0 || tmpX > 7 || tmpY > 7 || this.stones[tmpX][tmpY] == null) // Not enclosed
 				{
-					return false;
+					return 0;
 				}
 				nextStone = this.stones[tmpX][tmpY];
 				if (nextStone == turn) // Capture!
 				{
 					if (turnStones) this.turnStones(turn, x, y, tmpX, tmpY, xFactor, yFactor);
-					return true;
+					return stoneCount - 1;
 				}
 			}
-			return false;
+			return 0;
 		}
 		
 		private function turnStones(turn:Boolean, fromX:uint, fromY:uint, toX:uint, toY:uint, xFactor:uint, yFactor:uint):void
@@ -484,22 +537,28 @@ package
 			}
 		}
 		
-		private function onTurnFinished(changeTurns:Boolean):void
+		private function onTurnFinished(changeTurn:Boolean, saveHistory:Boolean):void
 		{
+			if (changeTurn) this.changeTurn();
 			this.calculateScore();
-			this.evaluateButtons();
-
-			if (this.isNextMovePossible(!this.turn))
+			if (this.isNextMovePossible(this.turn))
 			{
-				if (changeTurns) this.changeTurn();
+				this.finishTurn(saveHistory);
 				return;
 			}
 
-			if ((this.blackScore + this.whiteScore) == 64) // All stomes played. Game is over.
+			if ((this.blackScore + this.whiteScore) == 64) // All stones played. Game is over.
 			{
 				var allStonesPlayedAlert:Alert = new Alert(this.stage, this.ppi);
+				if (this.blackScore == this.whiteScore) // Tie game
+				{
+					allStonesPlayedAlert.show("Tie Game!", "Good job! You both finished with the exact same number of stones.");
+					this.finishTurn(saveHistory);
+					return;
+				}
 				var winner:String = (this.blackScore > this.whiteScore) ? BLACK_COLOR_NAME : WHITE_COLOR_NAME;
 				allStonesPlayedAlert.show(winner + " Wins!", "All stones have been played, so the game is over. Well done, " + winner + "!");
+				this.finishTurn(saveHistory);
 				return;
 			}
 			
@@ -509,22 +568,49 @@ package
 				var zeroPlayer:String = (this.blackScore == 0) ? BLACK_COLOR_NAME : WHITE_COLOR_NAME;
 				var nonZeroPlayer:String = (this.blackScore != 0) ? BLACK_COLOR_NAME : WHITE_COLOR_NAME;
 				allStonesCapturedAlert.show(nonZeroPlayer + " Wins!", nonZeroPlayer + " has captured all of " + zeroPlayer + "'s stones. Well done, " + nonZeroPlayer + "!");
+				this.finishTurn(saveHistory);
 				return;
 			}
 			
-			if (!this.isNextMovePossible(this.turn)) // Neither player can make a move. Unusual, but possible.
+			if (!this.isNextMovePossible(!this.turn)) // Neither player can make a move. Unusual, but possible. Game is over.
 			{
 				var noMoreMovesAlert:Alert = new Alert(this.stage, this.ppi);
+				if (this.blackScore == this.whiteScore) // Tie game
+				{
+					noMoreMovesAlert.show("Tie Game!", "Neither player can make a move, and you both have the exact same number of stones. Good game!");
+					this.finishTurn(saveHistory);
+					return;
+				}
 				var defaultWinner:String = (this.blackScore > this.whiteScore) ? BLACK_COLOR_NAME : WHITE_COLOR_NAME;
 				noMoreMovesAlert.show(defaultWinner + " Wins!", "Neither player can make a move, therefore the game is over and " + defaultWinner + " wins!");
+				this.finishTurn(saveHistory);
 				return;
 			}
 
 			// Game isn't over, but opponent can't place a stone.
+			if (changeTurn) this.changeTurn();
 			var noNextMoveAlert:Alert = new Alert(this.stage, this.ppi);
 			var side:String = (this.turn == WHITE) ? BLACK_COLOR_NAME : WHITE_COLOR_NAME;
 			var otherSide:String = (this.turn != WHITE) ? BLACK_COLOR_NAME : WHITE_COLOR_NAME;
+			noNextMoveAlert.addEventListener(AlertEvent.ALERT_CLICKED, onNoNextMovePossible);
 			noNextMoveAlert.show("No Move Available", side + " has no possible moves, and therefore must pass. It's still " + otherSide + "'s turn.");
+			this.finishTurn(saveHistory);
+		}
+
+		private function finishTurn(saveHistory:Boolean):void
+		{
+			if (saveHistory) this.saveHistory();
+			this.evaluateButtons();
+		}
+		
+		private function onNoNextMovePossible(e:AlertEvent):void
+		{
+			var alert:Alert = e.target as Alert;
+			alert.removeEventListener(AlertEvent.ALERT_CLICKED, onNoNextMovePossible);
+			if (this.playerMode == SINGLE_PLAYER_MODE && this.turn == computerColor)
+			{
+				this.onStartComputerMove();
+			}
 		}
 		
 		private function isNextMovePossible(player:Boolean):Boolean
@@ -534,7 +620,7 @@ package
 				for (var y:uint = 0; y < 8; ++y)
 				{
 					if (this.stones[x][y] != null) continue;
-					if (this.findCaptures(player, x, y, false)) return true;
+					if (this.findCaptures(player, x, y, false) > 0) return true;
 				}
 			}
 			return false;
@@ -593,6 +679,107 @@ package
 			this.whiteScoreLabel.update(String(this.whiteScore));
 			this.blackScoreLabel.update(String(this.blackScore));
 			this.alignScores();
+		}
+		
+		////  Simple AI ////
+		
+		private const TOP_LEFT_CORNER:Array     = [0,0];
+		private const TOP_RIGHT_CORNER:Array    = [7,0];
+		private const BOTTOM_LEFT_CORNER:Array  = [0,7];
+		private const BOTTOM_RIGHT_CORNER:Array = [7,7];
+		
+		private const TOP_LEFT_X:Array     = [1,1];
+		private const TOP_RIGHT_X:Array    = [6,1];
+		private const BOTTOM_LEFT_X:Array  = [1,6];
+		private const BOTTOM_RIGHT_X:Array = [6,6];
+		
+		private function onStartComputerMove():void
+		{
+			trace("onStartComputerMove");
+			
+			// Try to capture a corner
+			if (this.findCaptures(this.computerColor, TOP_LEFT_CORNER[0],     TOP_LEFT_CORNER[1],     false) > 0) {this.onFinishComputerMove(TOP_LEFT_CORNER[0],     TOP_LEFT_CORNER[1]);     return;}
+			if (this.findCaptures(this.computerColor, TOP_RIGHT_CORNER[0],    TOP_RIGHT_CORNER[1],    false) > 0) {this.onFinishComputerMove(TOP_RIGHT_CORNER[0],    TOP_RIGHT_CORNER[1]);    return;}
+			if (this.findCaptures(this.computerColor, BOTTOM_LEFT_CORNER[0],  BOTTOM_LEFT_CORNER[1],  false) > 0) {this.onFinishComputerMove(BOTTOM_LEFT_CORNER[0],  BOTTOM_LEFT_CORNER[1]);  return;}
+			if (this.findCaptures(this.computerColor, BOTTOM_RIGHT_CORNER[0], BOTTOM_RIGHT_CORNER[1], false) > 0) {this.onFinishComputerMove(BOTTOM_RIGHT_CORNER[0], BOTTOM_RIGHT_CORNER[1]); return;}
+			
+			trace("A");
+			
+			// Try to capture a side piece. Prioritize pieces closest to corners.
+			if (this.findAdjacentMove(TOP_LEFT_CORNER[0],     TOP_LEFT_CORNER[1],      1,  0)) return;
+			if (this.findAdjacentMove(TOP_RIGHT_CORNER[0],    TOP_RIGHT_CORNER[1],     0,  1)) return;
+			if (this.findAdjacentMove(BOTTOM_RIGHT_CORNER[0], BOTTOM_RIGHT_CORNER[1], -1,  0)) return;
+			if (this.findAdjacentMove(BOTTOM_LEFT_CORNER[0],  BOTTOM_LEFT_CORNER[1],   0, -1)) return;
+
+			trace("B");
+
+			// Find the move that captures the most stones (excluding X-squares).
+			var captureCounts:Array = new Array();
+			for (var x:uint = 0; x < 7; ++x)
+			{
+				for (var y:uint = 0; y < 7; ++y)
+				{
+					if (this.stones[x][y] != null) continue;
+					if ((x == TOP_LEFT_X[0] && y == TOP_LEFT_X[1]) || (x == TOP_RIGHT_X[0] && y == TOP_RIGHT_X[1]) || (x == BOTTOM_LEFT_X[0] && y == BOTTOM_LEFT_X[1]) || (x == BOTTOM_RIGHT_X[0] && y == BOTTOM_RIGHT_X[1])) continue;
+					var captureCount:uint = this.findCaptures(this.computerColor, x, y, false);
+					if (captureCount == 0) continue;
+					var captureData:Object = new Object();
+					captureData.stones = captureCount;
+					captureData.x = x;
+					captureData.y = y;
+					captureCounts.push(captureData);
+				}
+			}
+
+			trace("C");
+
+			if (captureCounts.length > 0)
+			{
+				captureCounts.sortOn("stones", Array.NUMERIC, Array.DESCENDING);
+				var bestMove:Object = captureCounts.pop();
+				if (bestMove.stones > 0)
+				{
+					this.onFinishComputerMove(bestMove.x, bestMove.y);
+					return;
+				}
+			}
+
+			trace("D");
+			
+			// No choice but to move in one of the x-squares
+			if (this.findCaptures(this.computerColor, TOP_LEFT_X[0],     TOP_LEFT_X[1],     false)) {this.onFinishComputerMove(TOP_LEFT_X[0],     TOP_LEFT_X[1]); return;}
+			if (this.findCaptures(this.computerColor, TOP_RIGHT_X[0],    TOP_RIGHT_X[1],    false)) {this.onFinishComputerMove(TOP_RIGHT_X[0],    TOP_RIGHT_X[1]); return;}
+			if (this.findCaptures(this.computerColor, BOTTOM_LEFT_X[0],  BOTTOM_LEFT_X[1],  false)) {this.onFinishComputerMove(BOTTOM_LEFT_X[0],  BOTTOM_LEFT_X[1]); return;}
+			if (this.findCaptures(this.computerColor, BOTTOM_RIGHT_X[0], BOTTOM_RIGHT_X[1], false)) {this.onFinishComputerMove(BOTTOM_RIGHT_X[0], BOTTOM_RIGHT_X[1]); return;}
+
+			trace("E");
+		}
+		
+		private function onFinishComputerMove(x:uint, y:uint):void
+		{
+			trace("onFinishComputerMove", x, y);
+			this.makeMove(x, y);
+			//this.onTurnFinished(true, true);
+		}
+		
+		private function findAdjacentMove(x:uint, y:uint, xFactor:int, yFactor:int):Boolean
+		{
+			var testX:uint = x, testY:uint = y;
+			for (var i:uint = 0; i < 6; ++i)
+			{
+				testX += xFactor;
+				testY += yFactor;
+				//trace(x, y, testX, testY, this.stones[testX][testY]);
+				if (this.stones[testX][testY] == null)
+				{
+					if (this.findCaptures(this.computerColor, testX, testY, false) > 0)
+					{
+						this.onFinishComputerMove(testX, testY);
+						return true;
+					}
+				}
+			}
+			return false;
 		}
 	}
 }
