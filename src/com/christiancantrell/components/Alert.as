@@ -100,7 +100,7 @@ package com.christiancantrell.components
 			}
 			
 			if (buttonCount == 2) buttonCount = 1;
-			var bgHeight:uint = (messageLabel.height + titleLabel.textHeight + (buttonCount * buttonHeight) + (MARGIN * (buttonCount + 2))) + 10;
+			var bgHeight:uint = (messageLabel.height + titleLabel.textHeight + (buttonCount * buttonHeight) + (MARGIN * (buttonCount + 2))) + 15;
 			
 			box.graphics.beginFill(BACKGROUND_COLOR, BACKGROUND_ALPHA);
 			box.graphics.drawRoundRect(0, 0, bgWidth, bgHeight, CORNER, CORNER);
