@@ -19,6 +19,8 @@ package
 	import flash.filters.BlurFilter;
 	import flash.filters.DropShadowFilter;
 	import flash.geom.Matrix;
+	import flash.net.SharedObject;
+	import flash.net.registerClassAlias;
 	import flash.system.Capabilities;
 	import flash.ui.Keyboard;
 	
@@ -44,6 +46,10 @@ package
 		private const TWO_PLAYER_STRING:String = "Two Player Game";
 		private const CANCEL_STRING:String = "Cancel";
 		private const COMPUTER_COLOR_STRING:String = "Computer Plays ";
+		private const SO_KEY:String = "com.christiancantrell.reversi";
+		private const HISTORY_KEY:String = "history";
+		private const PLAYER_MODE_KEY:String = "playerMode";
+		private const COMPUTER_COLOR_KEY:String = "computerColor";
 		private const CACHE_AS_BITMAP:Boolean = true;
 		
 		private var board:Sprite;
@@ -64,16 +70,45 @@ package
 		private var titleShadow:DropShadowFilter;
 		private var playerMode:String;
 		private var computerColor:Boolean;
+		private var so:SharedObject;
 		
 		public function Reversi(ppi:int = -1)
 		{
 			super();
+			registerClassAlias("com.christiancantrell.data.HistoryEntry", HistoryEntry);
+			this.so = SharedObject.getLocal(SO_KEY);
 			this.ppi = (ppi == -1) ? Capabilities.screenDPI : ppi;
-			this.prepareGame();
 			this.playerMode = SINGLE_PLAYER_MODE;
 			this.computerColor = WHITE;
+			if (!this.loadGame()) this.prepareGame();
 			this.initUIComponents();
 			this.addEventListener(Event.ADDED, onAddedToDisplayList);
+		}
+		
+		private function loadGame():Boolean
+		{
+			var oldGame:Array = this.so.data[HISTORY_KEY] as Array;
+			if (oldGame == null) return false;
+			this.history = oldGame;
+			var lastEntry:HistoryEntry;
+			for (var i:uint = this.history.length; i >= 0; --i)
+			{
+				if (this.history[i] != null)
+				{
+					lastEntry = this.history[i] as HistoryEntry;
+					this.historyIndex = i;
+					break;
+				}
+			}
+			this.turn = lastEntry.turn;
+			this.stones = this.deepCopyStoneArray(lastEntry.board);
+			this.playerMode = this.so.data[PLAYER_MODE_KEY];
+			if (this.playerMode == SINGLE_PLAYER_MODE)
+			{
+				this.computerColor = this.so.data[COMPUTER_COLOR_KEY];
+			}
+			this.calculateScore();
+			return true;
 		}
 		
 		private function prepareGame():void
@@ -339,6 +374,7 @@ package
 			var alert:Alert = e.target as Alert;
 			alert.removeEventListener(AlertEvent.ALERT_CLICKED, onNewGameConfirm);
 			if (e.label == CANCEL_STRING) return;
+			this.deletePersistentData();
 			if (e.label == TWO_PLAYER_STRING)
 			{
 				this.playerMode = TWO_PLAYER_MODE;
@@ -396,8 +432,20 @@ package
 			{
 				this.history[i] = null;
 			}
+			this.so.data[HISTORY_KEY] = this.history;
+			this.so.data[PLAYER_MODE_KEY] = this.playerMode;
+			this.so.data[COMPUTER_COLOR_KEY] = this.computerColor;
+			this.so.flush();
 		}
 		
+		private function deletePersistentData():void
+		{
+			this.so.data[HISTORY_KEY] = null;
+			this.so.data[PLAYER_MODE_KEY] = null;
+			this.so.data[COMPUTER_COLOR_KEY] = null;
+			this.so.flush();
+		}
+
 		private function placeStones():void
 		{
 			this.pieces = new Vector.<Sprite>(64);
@@ -692,9 +740,12 @@ package
 			}
 			this.blackScore = black;
 			this.whiteScore = white;
-			this.whiteScoreLabel.update(String(this.whiteScore));
-			this.blackScoreLabel.update(String(this.blackScore));
-			this.alignScores();
+			if (this.whiteScoreLabel!= null && this.blackScoreLabel != null)
+			{
+				this.whiteScoreLabel.update(String(this.whiteScore));
+				this.blackScoreLabel.update(String(this.blackScore));
+				this.alignScores();
+			}
 		}
 		
 		////  Simple triage-based AI. Opt for the best moves first, and the worst moves last. ////
