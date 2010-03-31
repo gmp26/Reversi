@@ -460,7 +460,7 @@ package
 					this.placeStone(this.stones[x][y], x, y);
 				}
 			}
-			this.board.cacheAsBitmap = CACHE_AS_BITMAP;
+			if (CACHE_AS_BITMAP) this.board.cacheAsBitmap = true;
 		}
 		
 		private function placeStone(color:Boolean, x:uint, y:uint):void
@@ -475,6 +475,7 @@ package
 			stone.graphics.drawCircle(stoneSize/2, stoneSize/2, stoneSize/2);
 			stone.graphics.endFill();
 			stone.filters = [this.stoneBevel];
+			if (CACHE_AS_BITMAP) stone.cacheAsBitmap = true;
 			stone.x = (x * cellSize) + 1;
 			stone.y = (y * cellSize) + 1;
 			this.board.addChild(stone);
