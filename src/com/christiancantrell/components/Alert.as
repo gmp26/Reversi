@@ -139,6 +139,8 @@ package com.christiancantrell.components
 			Layout.center(label, button);
 			button.addChild(label);
 			button.addEventListener(MouseEvent.CLICK, onButtonClick);
+			button.addEventListener(MouseEvent.MOUSE_DOWN, onButtonMouseDown);
+			button.addEventListener(MouseEvent.MOUSE_OUT, onButtonMouseOut);
 			button.mouseChildren = false;
 			return button;
 		}
@@ -161,6 +163,30 @@ package com.christiancantrell.components
 			var ae:AlertEvent = new AlertEvent();
 			ae.label = label.text;
 			this.dispatchEvent(ae);
+		}
+
+		private function onButtonMouseDown(e:MouseEvent):void
+		{
+			e.stopPropagation();
+			var button:Sprite = e.target as Sprite;
+			var overlay:Sprite = new Sprite();
+			overlay.x = 0;
+			overlay.y = 0;
+			overlay.graphics.beginFill(0xffffff, .75);
+			overlay.graphics.drawRect(0, 0, button.width, button.height);
+			overlay.graphics.endFill();
+			button.addChild(overlay);
+			button.graphics.beginFill(BUTTON_BORDER_COLOR);
+		}
+
+		private function onButtonMouseOut(e:MouseEvent):void
+		{
+			e.stopPropagation();
+			var button:Sprite = e.target as Sprite;
+			if (button.numChildren == 2)
+			{
+				button.removeChildAt(1);
+			}
 		}
 	}
 }
