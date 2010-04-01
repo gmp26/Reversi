@@ -139,7 +139,12 @@ package
 			this.boardShadow = new DropShadowFilter(0, 90, 0, 1, 10, 10, 1, 1);
 		}
 		
-		public function doLayout(e:Event):void
+		/**
+		 * Lays out the application dynamically based on screen size and DPI.
+		 * Public in case it needs to be called by the "host" code (which it
+		 * usually won't).
+		 **/
+		public function doLayout(e:Event = null):void
 		{
 			// Remove any children that have already been added.
 			while (this.numChildren > 0) this.removeChildAt(0);
@@ -217,7 +222,6 @@ package
 				this.whiteScoreLabel = new Label(String(this.whiteScore), "bold", WHITE_COLOR, "_sans", scoreSize);
 
 				Layout.centerHorizontally(this.title, this.stage);
-				this.alignScores();
 
 				buttonWidth = stageWidth / 3;
 				buttonHeight = Ruler.mmToPixels(10, this.ppi);
