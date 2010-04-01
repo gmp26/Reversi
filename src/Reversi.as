@@ -531,21 +531,22 @@ package
 			return newStones;
 		}
 		
-		private function findCaptures(turn:Boolean, x:uint, y:uint, turnStones:Boolean):uint
+		private function findCaptures(turn:Boolean, x:uint, y:uint, turnStones:Boolean, stones:Array = null):uint
 		{
-			if (this.stones[x][y] != null) return 0;
-			var topLeft:uint     = this.walkPath(turn, x, y, -1, -1, turnStones); // top left
-			var top:uint         = this.walkPath(turn, x, y,  0, -1, turnStones); // top
-			var topRight:uint    = this.walkPath(turn, x, y,  1, -1, turnStones); // top right
-			var right:uint       = this.walkPath(turn, x, y,  1,  0, turnStones); // right
-			var bottomRight:uint = this.walkPath(turn, x, y,  1,  1, turnStones); // bottom right
-			var bottom:uint      = this.walkPath(turn, x, y,  0,  1, turnStones); // bottom
-			var bottomLeft:uint  = this.walkPath(turn, x, y, -1, +1, turnStones); // bottom left
-			var left:uint        = this.walkPath(turn, x, y, -1,  0, turnStones); // left
+			stones = (stones == null) ? this.stones : stones;
+			if (stones[x][y] != null) return 0;
+			var topLeft:uint     = this.walkPath(turn, x, y, -1, -1, turnStones, stones); // top left
+			var top:uint         = this.walkPath(turn, x, y,  0, -1, turnStones, stones); // top
+			var topRight:uint    = this.walkPath(turn, x, y,  1, -1, turnStones, stones); // top right
+			var right:uint       = this.walkPath(turn, x, y,  1,  0, turnStones, stones); // right
+			var bottomRight:uint = this.walkPath(turn, x, y,  1,  1, turnStones, stones); // bottom right
+			var bottom:uint      = this.walkPath(turn, x, y,  0,  1, turnStones, stones); // bottom
+			var bottomLeft:uint  = this.walkPath(turn, x, y, -1, +1, turnStones, stones); // bottom left
+			var left:uint        = this.walkPath(turn, x, y, -1,  0, turnStones, stones); // left
 			return (topLeft + top + topRight + right + bottomRight + bottom + bottomLeft + left);
 		}
 		
-		private function walkPath(turn:Boolean, x:uint, y:uint, xFactor:int, yFactor:int, turnStones:Boolean):uint
+		private function walkPath(turn:Boolean, x:uint, y:uint, xFactor:int, yFactor:int, turnStones:Boolean, stones:Array):uint
 		{
 			// Are we in bounds?
 			if (x + xFactor > 7 || x + xFactor < 0 || y + yFactor > 7 || y + yFactor < 0)
@@ -554,12 +555,12 @@ package
 			}
 
 			// Is the next squre empty?
-			if (this.stones[x + xFactor][y + yFactor] == null)
+			if (stones[x + xFactor][y + yFactor] == null)
 			{
 				return 0;
 			}
 			
-			var nextStone:Boolean = this.stones[x + xFactor][y + yFactor];
+			var nextStone:Boolean = stones[x + xFactor][y + yFactor];
 
 			// Is the next stone the wrong color?
 			if (nextStone != !turn)
@@ -575,29 +576,29 @@ package
 				++stoneCount;
 				tmpX = tmpX + xFactor;
 				tmpY = tmpY + yFactor;
-				if (tmpX < 0 || tmpY < 0 || tmpX > 7 || tmpY > 7 || this.stones[tmpX][tmpY] == null) // Not enclosed
+				if (tmpX < 0 || tmpY < 0 || tmpX > 7 || tmpY > 7 || stones[tmpX][tmpY] == null) // Not enclosed
 				{
 					return 0;
 				}
 				nextStone = this.stones[tmpX][tmpY];
 				if (nextStone == turn) // Capture!
 				{
-					if (turnStones) this.turnStones(turn, x, y, tmpX, tmpY, xFactor, yFactor);
+					if (turnStones) this.turnStones(turn, x, y, tmpX, tmpY, xFactor, yFactor, stones);
 					return stoneCount - 1;
 				}
 			}
 			return 0;
 		}
 		
-		private function turnStones(turn:Boolean, fromX:uint, fromY:uint, toX:uint, toY:uint, xFactor:uint, yFactor:uint):void
+		private function turnStones(turn:Boolean, fromX:uint, fromY:uint, toX:uint, toY:uint, xFactor:uint, yFactor:uint, stones:Array):void
 		{
 			var nextX:uint = fromX, nextY:uint = fromY;
 			while (true)
 			{
 				nextX = nextX + xFactor;
 				nextY = nextY + yFactor;
-				this.stones[nextX][nextY] = turn;
-				this.placeStone(turn, nextX, nextY);
+				stones[nextX][nextY] = turn;
+				if (stones == this.stones) this.placeStone(turn, nextX, nextY);
 				if (nextX == toX && nextY == toY) return;
 			}
 		}
@@ -887,9 +888,7 @@ package
 		
 		private function onFinishComputerMove(x:uint, y:uint):void
 		{
-			trace("onFinishComputerMove", x, y);
 			this.makeMove(x, y);
-			//this.onTurnFinished(true, true);
 		}
 	}
 }
