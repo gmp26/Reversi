@@ -35,7 +35,7 @@ package
 		private const BACKGROUND_COLOR:uint   = 0x666666;
 		private const TITLE_COLOR:uint        = 0xffffff;
 		private const TURN_GLOW_COLORS:Array  = [0xffffff, 0x000000];
-		private const TITLE:String = "Reversi";
+		private const TITLE:String = "iReverse";
 		private const WHITE:Boolean = true;
 		private const BLACK:Boolean = false;
 		private const PORTRAIT:String = "portrait";
@@ -130,7 +130,7 @@ package
 		
 		private function initUIComponents():void
 		{
-			var titleSize:uint = Ruler.mmToPixels(7, this.ppi);
+			var titleSize:uint = Ruler.mmToPixels(6.5, this.ppi);
 			this.title = new Label(TITLE, "bold", TITLE_COLOR, "_sans", titleSize);
 			this.titleShadow = new DropShadowFilter(0, 90, 0, 1, 10, 10, 1, 1, false, true);
 			this.title.filters = [this.titleShadow];
@@ -208,9 +208,9 @@ package
 			this.placeStones();
 			this.board.addEventListener(MouseEvent.CLICK, onBoardClicked);
 
-			this.title.y = 24;
+			this.title.y = 28;
 			var gutterWidth:uint, gutterHeight:uint, scoreSize:uint;
-			var newGameButton:TextButton, buttonWidth:Number, buttonHeight:Number;
+			var newGameButton:TextButton, buttonWidth:Number, buttonHeight:Number, buttonTextSize:uint;
 			if (this.getOrientation() == PORTRAIT) // Portrait
 			{
 				gutterHeight = (stageHeight - boardSize) / 2;
@@ -225,20 +225,21 @@ package
 
 				buttonWidth = stageWidth / 3;
 				buttonHeight = Ruler.mmToPixels(10, this.ppi);
+				buttonTextSize = Ruler.mmToPixels(10, this.ppi);
 				
-				this.backButton = new TextButton("BACK", true, buttonWidth, buttonHeight);
+				this.backButton = new TextButton("BACK", buttonTextSize, true, buttonWidth, buttonHeight);
 				this.backButton.addEventListener(MouseEvent.CLICK, this.onBack);
 				this.backButton.x = 2;
 				this.backButton.y = (stageHeight - this.backButton.height) - 1;
 				this.addChild(this.backButton);
 				
-				newGameButton = new TextButton("NEW", true, buttonWidth - 6, buttonHeight);
+				newGameButton = new TextButton("NEW", buttonTextSize, true, buttonWidth - 6, buttonHeight);
 				newGameButton.x = (gutterWidth / 2) - (this.backButton.width / 2) + 3;
 				newGameButton.y = this.backButton.y;
 				newGameButton.addEventListener(MouseEvent.CLICK, onNewGameButtonClicked);
 				this.addChild(newGameButton);
 				
-				this.nextButton = new TextButton("NEXT", true, buttonWidth, buttonHeight);
+				this.nextButton = new TextButton("NEXT", buttonTextSize, true, buttonWidth, buttonHeight);
 				this.nextButton.addEventListener(MouseEvent.CLICK, this.onNext);
 				this.nextButton.x = gutterWidth - this.nextButton.width - 2;
 				this.nextButton.y = newGameButton.y;
@@ -254,24 +255,25 @@ package
 				this.blackScoreLabel = new Label(String(this.blackScore), "bold", BLACK_COLOR, "_sans", scoreSize);
 				this.whiteScoreLabel = new Label(String(this.whiteScore), "bold", WHITE_COLOR, "_sans", scoreSize);
 				
-				this.title.x = ((boardX / 2) - (this.title.width / 2) - 4);
+				this.title.x = ((boardX / 2) - (this.title.width / 2) - 1);
 
 				buttonWidth = gutterWidth - 10;
 				buttonHeight = Ruler.mmToPixels(10, this.ppi);
+				buttonTextSize = ((gutterWidth / 3) > 42) ? 42 : (gutterWidth / 3);
 
-				newGameButton = new TextButton("NEW", false, buttonWidth, buttonHeight);
+				newGameButton = new TextButton("NEW", buttonTextSize, false, buttonWidth, buttonHeight);
 				newGameButton.x = (stageWidth - gutterWidth) + ((gutterWidth - newGameButton.width) / 2);
-				newGameButton.y = 5;
+				newGameButton.y = newGameButton.height / 3;
 				newGameButton.addEventListener(MouseEvent.CLICK, onNewGameButtonClicked);
 				this.addChild(newGameButton);
 
-				this.backButton = new TextButton("BACK", false, buttonWidth, buttonHeight);
+				this.backButton = new TextButton("BACK", buttonTextSize, false, buttonWidth, buttonHeight);
 				this.backButton.addEventListener(MouseEvent.CLICK, this.onBack);
 				this.backButton.x = (gutterWidth - this.backButton.width) / 2;
 				this.backButton.y = (stageHeight - this.backButton.height) - 5;
 				this.addChild(this.backButton);
 				
-				this.nextButton = new TextButton("NEXT", false, buttonWidth, buttonHeight);
+				this.nextButton = new TextButton("NEXT", buttonTextSize, false, buttonWidth, buttonHeight);
 				this.nextButton.addEventListener(MouseEvent.CLICK, this.onNext);
 				this.nextButton.x = newGameButton.x;
 				this.nextButton.y = (stageHeight - this.nextButton.height) - 5;

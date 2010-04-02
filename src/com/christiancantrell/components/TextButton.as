@@ -13,13 +13,15 @@ package com.christiancantrell.components
 		private var _enabled:Boolean;
 		private var labelText:String;
 		private var buttonLabel:Label;
+		private var fontSize:uint;
 		
-		public function TextButton(labelText:String, background:Boolean = false, forcedWidth:int = -1, forcedHeight:int = -1)
+		public function TextButton(labelText:String, fontSize:uint = 32, background:Boolean = false, forcedWidth:int = -1, forcedHeight:int = -1)
 		{
 			super();
 			
 			this._enabled = true;
 			this.labelText = labelText;
+			this.fontSize = fontSize;
 			
 			this.drawLabel(ENABLED_COLOR);
 			
@@ -40,7 +42,7 @@ package com.christiancantrell.components
 		private function drawLabel(color:uint):void
 		{
 			if (this.buttonLabel != null) this.removeChild(this.buttonLabel);
-			this.buttonLabel = new Label(labelText, "bold", color, "_sans", 32);
+			this.buttonLabel = new Label(labelText, "bold", color, "_sans", this.fontSize);
 		}
 		
 		private function placeLabel():void
