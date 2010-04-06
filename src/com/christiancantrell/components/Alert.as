@@ -88,12 +88,12 @@ package com.christiancantrell.components
 			
 			var box:Sprite = new Sprite();
 			
-			var titleLabel:Label = new Label(this._title, "bold", FONT_COLOR);
+			var titleLabel:Label = new Label(this._title, "bold", FONT_COLOR, "_sans", Ruler.mmToPixels(8, this._ppi));
 			titleLabel.x = (bgWidth / 2) - (titleLabel.width / 2);
 			titleLabel.y = 15 + MARGIN;
 			box.addChild(titleLabel);
 
-			var messageLabel:MultilineLabel = new MultilineLabel(_message, bgWidth - (MARGIN * 2), -1, "normal", FONT_COLOR);
+			var messageLabel:MultilineLabel = new MultilineLabel(_message, bgWidth - (MARGIN * 2), -1, "normal", FONT_COLOR, "_sans", Ruler.mmToPixels(6.5, this._ppi));
 			messageLabel.x = MARGIN;
 			messageLabel.y = titleLabel.y + (MARGIN * 1.5);
 			box.addChild(messageLabel);
@@ -168,7 +168,7 @@ package com.christiancantrell.components
 			button.graphics.endFill();
 			button.graphics.lineStyle(2, BUTTON_BORDER_COLOR, 1, true, "normal", CapsStyle.NONE);
 			button.graphics.drawRoundRect(0, 0, width, height, CORNER, CORNER);
-			var label:Label = new Label(buttonLabel, "normal", FONT_COLOR);
+			var label:Label = new Label(buttonLabel, "normal", FONT_COLOR, "_sans", Ruler.mmToPixels(6.5, this._ppi));
 			Layout.center(label, button);
 			button.addChild(label);
 			button.addEventListener(MouseEvent.CLICK, onButtonClick);
