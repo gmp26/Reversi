@@ -687,7 +687,7 @@ package
 				{
 					newStone = newStones[i] as Sprite;
 					oldStone = oldStones[i] as Sprite;
-
+					
 					newStone.alpha += .1;
 					oldStone.alpha -= .1;
 					
