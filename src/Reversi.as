@@ -48,6 +48,7 @@ package
 	import flash.events.Event;
 	import flash.events.KeyboardEvent;
 	import flash.events.MouseEvent;
+	import flash.events.TimerEvent;
 	import flash.filters.BevelFilter;
 	import flash.filters.BlurFilter;
 	import flash.filters.DropShadowFilter;
@@ -56,6 +57,7 @@ package
 	import flash.net.registerClassAlias;
 	import flash.system.Capabilities;
 	import flash.ui.Keyboard;
+	import flash.utils.Timer;
 	
 	public class Reversi extends Sprite
 	{
@@ -84,6 +86,8 @@ package
 		private const PLAYER_MODE_KEY:String = "playerMode";
 		private const COMPUTER_COLOR_KEY:String = "computerColor";
 		private const CACHE_AS_BITMAP:Boolean = true;
+		private const STONE_EFFECT_INTERVAL:uint = 40;
+		private const COMPUTER_WAIT_TIME:uint = 1000; // milliseconds
 		
 		private var board:Sprite;
 		private var stones:Array;
@@ -104,6 +108,8 @@ package
 		private var playerMode:String;
 		private var computerColor:Boolean;
 		private var so:SharedObject;
+		private var stoneEffectTimer:Timer;
+		private var computerWaitTimer:Timer;
 		
 		public function Reversi(ppi:int = -1)
 		{
@@ -170,6 +176,8 @@ package
 			this.turnFilter = new BlurFilter(8, 8, 1);
 			this.stoneBevel = new BevelFilter(1, 45);
 			this.boardShadow = new DropShadowFilter(0, 90, 0, 1, 10, 10, 1, 1);
+			this.stoneEffectTimer = new Timer(STONE_EFFECT_INTERVAL);
+			this.computerWaitTimer = new Timer(COMPUTER_WAIT_TIME);
 		}
 		
 		/**
@@ -504,11 +512,17 @@ package
 		
 		private function placeStone(color:Boolean, x:uint, y:uint):void
 		{
+			this.removePieceFromBoard(x, y);
+			var stone:Sprite = this.getStone(color, x, y);
+			this.pieces[this.coordinatesToIndex(x, y)] = stone;
+			this.board.addChild(stone);
+		}
+		
+		private function getStone(color:Boolean, x:uint, y:uint):Sprite
+		{
 			var cellSize:Number = (this.board.width / 8); 
 			var stoneSize:Number = cellSize - 2;
-			this.removePieceFromBoard(x, y);
 			var stone:Sprite = new Sprite();
-			this.pieces[this.coordinatesToIndex(x, y)] = stone;
 			stone.mouseEnabled = false;
 			stone.graphics.beginFill((color == WHITE) ? WHITE_COLOR : BLACK_COLOR);
 			stone.graphics.drawCircle(stoneSize/2, stoneSize/2, stoneSize/2);
@@ -517,7 +531,7 @@ package
 			if (CACHE_AS_BITMAP) stone.cacheAsBitmap = true;
 			stone.x = (x * cellSize) + 1;
 			stone.y = (y * cellSize) + 1;
-			this.board.addChild(stone);
+			return stone;
 		}
 		
 		private function removePieceFromBoard(x:uint, y:uint):void
@@ -632,14 +646,64 @@ package
 		private function turnStones(turn:Boolean, fromX:uint, fromY:uint, toX:uint, toY:uint, xFactor:uint, yFactor:uint, stones:Array):void
 		{
 			var nextX:uint = fromX, nextY:uint = fromY;
+			var stonesToTurn:Array = new Array();
 			while (true)
 			{
 				nextX = nextX + xFactor;
 				nextY = nextY + yFactor;
 				stones[nextX][nextY] = turn;
-				if (stones == this.stones) this.placeStone(turn, nextX, nextY);
-				if (nextX == toX && nextY == toY) return;
+				if (stones == this.stones)
+				{
+					if (toX != nextX || toY != nextY)
+					{
+						stonesToTurn.push({turn:turn, x:nextX, y:nextY});
+					}
+				}
+				if (nextX == toX && nextY == toY)
+				{
+					this.playStoneEffects(stonesToTurn);
+					break;
+				}
 			}
+		}
+		
+		private function playStoneEffects(stonesToTurn:Array):void
+		{
+			var newStones:Array = new Array(), oldStones:Array = new Array(), newStone:Sprite, oldStone:Sprite;
+			for each (var stoneToTurn:Object in stonesToTurn)
+			{
+				var index:uint = this.coordinatesToIndex(stoneToTurn.x, stoneToTurn.y);
+				newStone = this.getStone(stoneToTurn.turn, stoneToTurn.x, stoneToTurn.y);
+				newStone.alpha = 0;
+				this.board.addChild(newStone);
+				newStones.push(newStone);
+				oldStones.push(this.pieces[index]);
+				this.pieces[index] = newStone;
+			}
+			
+			var animate:Function = function():void
+			{
+				for (var i:uint = 0; i < newStones.length; ++i)
+				{
+					newStone = newStones[i] as Sprite;
+					oldStone = oldStones[i] as Sprite;
+
+					newStone.alpha += .1;
+					oldStone.alpha -= .1;
+					
+					if (newStone.alpha >= 1)
+					{
+						board.removeChild(oldStone);
+						if (i == newStones.length - 1)
+						{
+							stoneEffectTimer.stop();
+							stoneEffectTimer.removeEventListener(TimerEvent.TIMER, animate);
+						}
+					}
+				}
+			};
+			stoneEffectTimer.addEventListener(TimerEvent.TIMER, animate);
+			this.stoneEffectTimer.start();
 		}
 		
 		private function onTurnFinished(changeTurn:Boolean, saveHistory:Boolean):void
@@ -788,6 +852,21 @@ package
 				this.alignScores();
 			}
 		}
+
+		private function onStartComputerMove():void
+		{
+			var computerGo:Function = function():void
+			{
+				if (!stoneEffectTimer.running)
+				{
+					computerWaitTimer.stop();
+					computerWaitTimer.removeEventListener(TimerEvent.TIMER, computerGo);
+					calculateMove();
+				}
+			};
+			this.computerWaitTimer.addEventListener(TimerEvent.TIMER, computerGo);
+			this.computerWaitTimer.start();
+		}
 		
 		////  Simple triage-based AI. Opt for the best moves first, and the worst moves last. ////
 		
@@ -809,8 +888,8 @@ package
 		private const BOTTOM_BOTTOM_RIGHT:Array = [6,7];
 		private const BOTTOM_TOP_LEFT:Array     = [0,6];
 		private const BOTTOM_BOTTOM_LEFT:Array  = [1,7];
-		
-		private function onStartComputerMove():void
+
+		private function calculateMove():void
 		{
 			// Try to capture a corner...
 			if (this.findCaptures(this.computerColor, TOP_LEFT_CORNER[0],     TOP_LEFT_CORNER[1],     false) > 0) {this.onFinishComputerMove(TOP_LEFT_CORNER[0],     TOP_LEFT_CORNER[1]);     return;}
