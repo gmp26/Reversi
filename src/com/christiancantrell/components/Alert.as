@@ -56,6 +56,10 @@ package com.christiancantrell.components
 		private const FONT_COLOR:uint              = 0xffffff;
 		private const CORNER:uint                  = 0;
 		private const MARGIN:uint                  = 15;
+	
+		private var titleFontSize:uint;
+		private var textFontSize:uint;
+		private var buttonFontSize:uint;
 		
 		private var _stage:Stage;
 		private var _ppi:uint;
@@ -67,6 +71,12 @@ package com.christiancantrell.components
 		{
 			this._stage = stage;
 			this._ppi = ppi;
+			//this.titleFontSize  = Ruler.mmToPixels(7, this._ppi);
+			//this.textFontSize   = Ruler.mmToPixels(5, this._ppi);
+			//this.buttonFontSize = Ruler.mmToPixels(5, this._ppi);
+			this.titleFontSize  = 20;
+			this.textFontSize   = 18;
+			this.buttonFontSize = 18;
 		}
 		
 		public function show(title:String, message:String, buttonLabels:Array = null):void
@@ -84,22 +94,22 @@ package com.christiancantrell.components
 			this.graphics.clear();
 			if (this._stage.contains(this)) this._stage.removeChild(this);
 
-			var bgWidth:uint = (this._stage.stageHeight > this._stage.stageWidth) ? (this._stage.stageWidth * .75) : (this._stage.stageHeight * .8);
+			var bgWidth:uint = this._stage.stageWidth * .8;
 			
 			var box:Sprite = new Sprite();
 			
-			var titleLabel:Label = new Label(this._title, "bold", FONT_COLOR, "_sans", Ruler.mmToPixels(8, this._ppi));
+			var titleLabel:Label = new Label(this._title, "bold", FONT_COLOR, "_sans", this.titleFontSize);
 			titleLabel.x = (bgWidth / 2) - (titleLabel.width / 2);
 			titleLabel.y = 15 + MARGIN;
 			box.addChild(titleLabel);
 
-			var messageLabel:MultilineLabel = new MultilineLabel(_message, bgWidth - (MARGIN * 2), -1, "normal", FONT_COLOR, "_sans", Ruler.mmToPixels(6.5, this._ppi));
+			var messageLabel:MultilineLabel = new MultilineLabel(_message, bgWidth - (MARGIN * 2), -1, "normal", FONT_COLOR, "_sans", this.textFontSize);
 			messageLabel.x = MARGIN;
 			messageLabel.y = titleLabel.y + (MARGIN * 1.5);
 			box.addChild(messageLabel);
 						
 			var buttonCount:uint = (this._buttonLabels == null) ? 0 : this._buttonLabels.length;
-			var buttonHeight:uint = Ruler.mmToPixels(Ruler.MIN_BUTTON_SIZE_MM, this._ppi) + 10;
+			var buttonHeight:uint = Ruler.mmToPixels(Ruler.MIN_BUTTON_SIZE_MM, this._ppi);
 			
 			if (buttonCount == 1)
 			{
@@ -168,7 +178,7 @@ package com.christiancantrell.components
 			button.graphics.endFill();
 			button.graphics.lineStyle(2, BUTTON_BORDER_COLOR, 1, true, "normal", CapsStyle.NONE);
 			button.graphics.drawRoundRect(0, 0, width, height, CORNER, CORNER);
-			var label:Label = new Label(buttonLabel, "normal", FONT_COLOR, "_sans", Ruler.mmToPixels(6.5, this._ppi));
+			var label:Label = new Label(buttonLabel, "normal", FONT_COLOR, "_sans", this.buttonFontSize);
 			Layout.center(label, button);
 			button.addChild(label);
 			button.addEventListener(MouseEvent.CLICK, onButtonClick);
