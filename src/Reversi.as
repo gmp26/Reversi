@@ -41,6 +41,8 @@ package
 	import com.christiancantrell.utils.Layout;
 	import com.christiancantrell.utils.Ruler;
 	
+	import flash.display.Bitmap;
+	import flash.display.BitmapData;
 	import flash.display.GradientType;
 	import flash.display.InterpolationMethod;
 	import flash.display.SpreadMethod;
@@ -95,13 +97,12 @@ package
 		private var pieces:Vector.<Sprite>;
 		private var history:Array;
 		private var historyIndex:int;
-		private var title:Label;
 		private var blackScoreLabel:Label, whiteScoreLabel:Label;
 		private var backButton:TextButton, nextButton:TextButton;
 		private var blackScore:uint;
 		private var whiteScore:uint;
 		private var turnFilter:BlurFilter;
-		private var ppi:uint;
+		private var ppi:Number;
 		private var stoneBevel:BevelFilter;
 		private var boardShadow:DropShadowFilter;
 		private var titleShadow:DropShadowFilter;
@@ -111,7 +112,10 @@ package
 		private var stoneEffectTimer:Timer;
 		private var computerWaitTimer:Timer;
 		
-		public function Reversi(ppi:int = -1)
+		private var whiteStoneBitmap:Bitmap;
+		private var blackStoneBitmap:Bitmap;
+		
+		public function Reversi(ppi:Number = -1)
 		{
 			super();
 			registerClassAlias("com.christiancantrell.data.HistoryEntry", HistoryEntry);
@@ -169,12 +173,9 @@ package
 		
 		private function initUIComponents():void
 		{
-			var titleSize:uint = Ruler.mmToPixels(6.5, this.ppi);
-			this.title = new Label(TITLE, "bold", TITLE_COLOR, "_sans", titleSize);
 			this.titleShadow = new DropShadowFilter(0, 90, 0, 1, 10, 10, 1, 1, false, true);
-			this.title.filters = [this.titleShadow];
 			this.turnFilter = new BlurFilter(8, 8, 1);
-			this.stoneBevel = new BevelFilter(1, 45);
+			this.stoneBevel = new BevelFilter(.75, 45, 0xffffff, 1, 0x000000, 1);
 			this.boardShadow = new DropShadowFilter(0, 90, 0, 1, 10, 10, 1, 1);
 			this.stoneEffectTimer = new Timer(STONE_EFFECT_INTERVAL);
 			this.computerWaitTimer = new Timer(COMPUTER_WAIT_TIME);
@@ -246,12 +247,32 @@ package
 			}
 
 			this.addChild(this.board);
+
+			// Create the stone bitmaps
+			var cellSize:uint = (this.board.width / 8); 
+			var stoneSize:uint = cellSize - 4;
+			var tmpStone:Sprite = new Sprite();
+			tmpStone.graphics.beginFill(WHITE_COLOR);
+			tmpStone.graphics.drawCircle(stoneSize/2, stoneSize/2, stoneSize/2);
+			tmpStone.graphics.endFill();
+			tmpStone.filters = [this.stoneBevel];
+			var tmpStoneBitmapData:BitmapData = new BitmapData(tmpStone.width, tmpStone.height, true, 0x000000);
+			tmpStoneBitmapData.draw(tmpStone);
+			this.whiteStoneBitmap = new Bitmap(tmpStoneBitmapData);
+			tmpStone = new Sprite();
+			tmpStone.graphics.beginFill(BLACK_COLOR);
+			tmpStone.graphics.drawCircle(stoneSize/2, stoneSize/2, stoneSize/2);
+			tmpStone.graphics.endFill();
+			tmpStone.filters = [this.stoneBevel];
+			tmpStoneBitmapData = new BitmapData(tmpStone.width, tmpStone.height, true, 0x000000);
+			tmpStoneBitmapData.draw(tmpStone);
+			this.blackStoneBitmap = new Bitmap(tmpStoneBitmapData);
+
 			this.placeStones();
 			this.board.addEventListener(MouseEvent.CLICK, onBoardClicked);
 
-			this.title.y = 28;
 			var gutterWidth:uint, gutterHeight:uint, scoreSize:uint;
-			var newGameButton:TextButton, buttonWidth:Number, buttonHeight:Number, buttonTextSize:uint;
+			var newGameButton:TextButton, buttonWidth:Number, buttonHeight:Number, buttonTextSize:uint, title:Label;
 			if (this.getOrientation() == PORTRAIT) // Portrait
 			{
 				gutterHeight = (stageHeight - boardSize) / 2;
@@ -262,11 +283,14 @@ package
 				this.blackScoreLabel = new Label(String(this.blackScore), "bold", BLACK_COLOR, "_sans", scoreSize);
 				this.whiteScoreLabel = new Label(String(this.whiteScore), "bold", WHITE_COLOR, "_sans", scoreSize);
 
-				Layout.centerHorizontally(this.title, this.stage);
+				title = new Label(TITLE, "bold", TITLE_COLOR, "_sans", gutterHeight/4);
+				title.filters = [this.titleShadow];
+				title.y = title.height;
+				Layout.centerHorizontally(title, this.stage);
 
 				buttonWidth = stageWidth / 3;
-				buttonHeight = Ruler.mmToPixels(10, this.ppi);
-				buttonTextSize = Ruler.mmToPixels(10, this.ppi);
+				buttonHeight = Ruler.mmToPixels(8, this.ppi);
+				buttonTextSize = Ruler.mmToPixels(5.5, this.ppi);
 				
 				this.backButton = new TextButton("BACK", buttonTextSize, true, buttonWidth, buttonHeight);
 				this.backButton.addEventListener(MouseEvent.CLICK, this.onBack);
@@ -296,30 +320,44 @@ package
 				this.blackScoreLabel = new Label(String(this.blackScore), "bold", BLACK_COLOR, "_sans", scoreSize);
 				this.whiteScoreLabel = new Label(String(this.whiteScore), "bold", WHITE_COLOR, "_sans", scoreSize);
 				
-				this.title.x = ((boardX / 2) - (this.title.width / 2) - 1);
+				title = new Label(TITLE, "bold", TITLE_COLOR, "_sans", (gutterWidth/TITLE.length) + 4);
+				title.filters = [this.titleShadow];
+				title.y = title.height;
+				title.x = ((boardX / 2) - (title.width / 2) - 1);
 
 				buttonWidth = gutterWidth - 10;
-				buttonHeight = Ruler.mmToPixels(10, this.ppi);
-				buttonTextSize = ((gutterWidth / 3) > 42) ? 42 : (gutterWidth / 3);
+				buttonHeight = Ruler.mmToPixels(10, this.ppi) + 4;
+				buttonTextSize = ((gutterWidth / 3) > 42) ? 42 : ((gutterWidth / 3) - 1);
 
-				newGameButton = new TextButton("NEW", buttonTextSize, false, buttonWidth, buttonHeight);
+				newGameButton = new TextButton("NEW", buttonTextSize, true, buttonWidth, buttonHeight);
 				newGameButton.x = (stageWidth - gutterWidth) + ((gutterWidth - newGameButton.width) / 2);
-				newGameButton.y = newGameButton.height / 3;
+				newGameButton.y = 5;
 				newGameButton.addEventListener(MouseEvent.CLICK, onNewGameButtonClicked);
 				this.addChild(newGameButton);
 
-				this.backButton = new TextButton("BACK", buttonTextSize, false, buttonWidth, buttonHeight);
+				this.backButton = new TextButton("BACK", buttonTextSize, true, buttonWidth, buttonHeight);
 				this.backButton.addEventListener(MouseEvent.CLICK, this.onBack);
 				this.backButton.x = (gutterWidth - this.backButton.width) / 2;
-				this.backButton.y = (stageHeight - this.backButton.height) - 5;
+				this.backButton.y = (stageHeight - this.backButton.height);
 				this.addChild(this.backButton);
 				
-				this.nextButton = new TextButton("NEXT", buttonTextSize, false, buttonWidth, buttonHeight);
+				this.nextButton = new TextButton("NEXT", buttonTextSize, true, buttonWidth, buttonHeight);
 				this.nextButton.addEventListener(MouseEvent.CLICK, this.onNext);
 				this.nextButton.x = newGameButton.x;
-				this.nextButton.y = (stageHeight - this.nextButton.height) - 5;
+				this.nextButton.y = (stageHeight - this.nextButton.height);
 				this.addChild(this.nextButton);
 			}
+			
+			if (CACHE_AS_BITMAP)
+			{
+				title.cacheAsBitmap = true;
+				newGameButton.cacheAsBitmap = true;
+				this.backButton.cacheAsBitmap = true;
+				this.nextButton.cacheAsBitmap = true;
+				this.blackScoreLabel.cacheAsBitmap = true;
+				this.whiteScoreLabel.cacheAsBitmap = true;
+			}
+			
 			this.evaluateButtons();
 			this.addChild(title);
 			this.alignScores();
@@ -507,6 +545,7 @@ package
 					this.placeStone(this.stones[x][y], x, y);
 				}
 			}
+			// TBD: Probably remove. This should be happning when the filter is applied.
 			if (CACHE_AS_BITMAP) this.board.cacheAsBitmap = true;
 		}
 		
@@ -521,16 +560,13 @@ package
 		private function getStone(color:Boolean, x:uint, y:uint):Sprite
 		{
 			var cellSize:Number = (this.board.width / 8); 
-			var stoneSize:Number = cellSize - 2;
 			var stone:Sprite = new Sprite();
 			stone.mouseEnabled = false;
-			stone.graphics.beginFill((color == WHITE) ? WHITE_COLOR : BLACK_COLOR);
-			stone.graphics.drawCircle(stoneSize/2, stoneSize/2, stoneSize/2);
+			stone.graphics.beginBitmapFill((color == WHITE) ? this.whiteStoneBitmap.bitmapData : this.blackStoneBitmap.bitmapData, null, false, false);
+			stone.graphics.drawRect(0, 0, this.whiteStoneBitmap.bitmapData.width, this.whiteStoneBitmap.bitmapData.height);
 			stone.graphics.endFill();
-			stone.filters = [this.stoneBevel];
-			if (CACHE_AS_BITMAP) stone.cacheAsBitmap = true;
-			stone.x = (x * cellSize) + 1;
-			stone.y = (y * cellSize) + 1;
+			stone.x = (x * cellSize) + 2;
+			stone.y = (y * cellSize) + 2;
 			return stone;
 		}
 		
@@ -551,6 +587,7 @@ package
 		private function onBoardClicked(e:MouseEvent):void
 		{
 			if (this.playerMode == SINGLE_PLAYER_MODE && this.turn == this.computerColor) return;
+			if (this.stoneEffectTimer.running) return;
 			var scaleFactor:uint = this.board.width / 8;
 			var x:uint = e.localX / scaleFactor;
 			var y:uint = e.localY / scaleFactor;
