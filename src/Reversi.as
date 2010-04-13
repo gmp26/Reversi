@@ -41,12 +41,14 @@ package
 	import com.christiancantrell.utils.Layout;
 	import com.christiancantrell.utils.Ruler;
 	
+	import flash.accessibility.Accessibility;
 	import flash.display.Bitmap;
 	import flash.display.BitmapData;
 	import flash.display.GradientType;
 	import flash.display.InterpolationMethod;
 	import flash.display.SpreadMethod;
 	import flash.display.Sprite;
+	import flash.events.AccelerometerEvent;
 	import flash.events.Event;
 	import flash.events.KeyboardEvent;
 	import flash.events.MouseEvent;
@@ -57,6 +59,7 @@ package
 	import flash.geom.Matrix;
 	import flash.net.SharedObject;
 	import flash.net.registerClassAlias;
+	import flash.sensors.Accelerometer;
 	import flash.system.Capabilities;
 	import flash.ui.Keyboard;
 	import flash.utils.Timer;
@@ -98,7 +101,7 @@ package
 		private var history:Array;
 		private var historyIndex:int;
 		private var blackScoreLabel:Label, whiteScoreLabel:Label;
-		private var backButton:TextButton, nextButton:TextButton;
+		private var backButton:TextButton, backButton2:TextButton, nextButton:TextButton, nextButton2:TextButton;
 		private var blackScore:uint;
 		private var whiteScore:uint;
 		private var turnFilter:BlurFilter;
@@ -111,9 +114,11 @@ package
 		private var so:SharedObject;
 		private var stoneEffectTimer:Timer;
 		private var computerWaitTimer:Timer;
-		
 		private var whiteStoneBitmap:Bitmap;
 		private var blackStoneBitmap:Bitmap;
+		private var layoutPending:Boolean;
+		private var headToHead:Boolean;
+		private var accelerometer:Accelerometer;
 		
 		public function Reversi(ppi:Number = -1)
 		{
@@ -126,6 +131,12 @@ package
 			if (!this.loadGame()) this.prepareGame();
 			this.initUIComponents();
 			this.addEventListener(Event.ADDED, onAddedToDisplayList);
+			if (Accelerometer.isSupported)
+			{
+				this.accelerometer = new Accelerometer();
+				this.accelerometer.setRequestedUpdateInterval(1500);
+				this.accelerometer.addEventListener(AccelerometerEvent.UPDATE, onAccelerometerUpdated);
+			}
 		}
 		
 		private function loadGame():Boolean
@@ -179,6 +190,22 @@ package
 			this.boardShadow = new DropShadowFilter(0, 90, 0, 1, 10, 10, 1, 1);
 			this.stoneEffectTimer = new Timer(STONE_EFFECT_INTERVAL);
 			this.computerWaitTimer = new Timer(COMPUTER_WAIT_TIME);
+			this.layoutPending = false;
+		}
+		
+		private function onAccelerometerUpdated(e:AccelerometerEvent):void
+		{
+			if (this.getOrientation() != PORTRAIT || this.playerMode != TWO_PLAYER_MODE) return;
+			if (!this.headToHead && e.accelerationZ <= -.999)
+			{
+				this.headToHead = true;
+				this.doLayout();
+			}
+			else if (this.headToHead && e.accelerationZ >= -.999)
+			{
+				this.headToHead = false;
+				this.doLayout();
+			}
 		}
 		
 		/**
@@ -186,13 +213,19 @@ package
 		 * Public in case it needs to be called by the "host" code (which it
 		 * usually won't).
 		 **/
-		public function doLayout(e:Event = null):void
+		public function doLayout(e:Event = null, stageWidth:int = -1, stageHeight:int = -1):void
 		{
+			if (this.stoneEffectTimer.running)
+			{
+				this.layoutPending = true;
+				return;
+			}
+			
 			// Remove any children that have already been added.
 			while (this.numChildren > 0) this.removeChildAt(0);
-			
-			var stageWidth:uint = this.stage.stageWidth;
-			var stageHeight:uint = this.stage.stageHeight;
+
+			if (stageWidth  == -1) stageWidth  = this.stage.stageWidth;
+			if (stageHeight == -1) stageHeight = this.stage.stageHeight;
 			
 			// Draw the background
 			var bg:Sprite = new Sprite();
@@ -272,8 +305,56 @@ package
 			this.board.addEventListener(MouseEvent.CLICK, onBoardClicked);
 
 			var gutterWidth:uint, gutterHeight:uint, scoreSize:uint;
-			var newGameButton:TextButton, buttonWidth:Number, buttonHeight:Number, buttonTextSize:uint, title:Label;
-			if (this.getOrientation() == PORTRAIT) // Portrait
+			var newGameButton:TextButton, newGameButton2:TextButton, buttonWidth:Number, buttonHeight:Number, buttonTextSize:uint, title:Label;
+			this.backButton2 = null;
+			this.nextButton2 = null;
+			
+			if (this.headToHead && this.getOrientation() != PORTRAIT) this.headToHead = false;
+			
+			if (this.headToHead) // Head-to-head
+			{
+				gutterHeight = (stageHeight - boardSize) / 2;
+				gutterWidth = stageWidth;
+
+				// Scores
+				scoreSize = gutterHeight * .6;;
+				this.blackScoreLabel = new Label(String(this.blackScore), "bold", BLACK_COLOR, "_sans", scoreSize);
+				this.whiteScoreLabel = new Label(String(this.whiteScore), "bold", WHITE_COLOR, "_sans", scoreSize);
+
+				buttonWidth = stageWidth / 3;
+				buttonHeight = Ruler.mmToPixels(8, this.ppi);
+				buttonTextSize = Ruler.mmToPixels(5.5, this.ppi);
+				
+				
+				// Buttons
+				this.backButton = new TextButton("BACK", buttonTextSize, true, buttonWidth, buttonHeight);
+				this.backButton.addEventListener(MouseEvent.CLICK, this.onBack);
+				this.backButton.x = 2;
+				this.backButton.y = (stageHeight - this.backButton.height) - 1;
+				this.addChild(this.backButton);
+				
+				this.nextButton = new TextButton("NEXT", buttonTextSize, true, buttonWidth, buttonHeight);
+				this.nextButton.addEventListener(MouseEvent.CLICK, this.onNext);
+				this.nextButton.x = gutterWidth - this.nextButton.width - 2;
+				this.nextButton.y = backButton.y;
+				this.addChild(this.nextButton);
+				
+				// Second set of buttons
+				this.backButton2 = new TextButton("BACK", buttonTextSize, true, buttonWidth, buttonHeight);
+				this.backButton2.rotation = 180;
+				this.backButton2.addEventListener(MouseEvent.CLICK, this.onBack);
+				this.backButton2.x = this.backButton2.width + 2;
+				this.backButton2.y = this.backButton2.height + 2;
+				this.addChild(this.backButton2);
+				
+				this.nextButton2 = new TextButton("NEXT", buttonTextSize, true, buttonWidth, buttonHeight);
+				this.nextButton2.rotation = 180;
+				this.nextButton2.addEventListener(MouseEvent.CLICK, this.onNext);
+				this.nextButton2.x = gutterWidth - 1.5;
+				this.nextButton2.y = backButton2.y;
+				this.addChild(this.nextButton2);
+			}
+			else if (this.getOrientation() == PORTRAIT) // Portrait
 			{
 				gutterHeight = (stageHeight - boardSize) / 2;
 				gutterWidth = stageWidth;
@@ -350,16 +431,19 @@ package
 			
 			if (CACHE_AS_BITMAP)
 			{
-				title.cacheAsBitmap = true;
-				newGameButton.cacheAsBitmap = true;
+				if (title != null) title.cacheAsBitmap = true;
+				if (newGameButton != null) newGameButton.cacheAsBitmap = true;
+				if (newGameButton2 != null) newGameButton2.cacheAsBitmap = true;
 				this.backButton.cacheAsBitmap = true;
+				if (this.backButton2 != null) this.backButton2.cacheAsBitmap = true;
 				this.nextButton.cacheAsBitmap = true;
+				if (this.nextButton2 != null) this.nextButton2.cacheAsBitmap = true;
 				this.blackScoreLabel.cacheAsBitmap = true;
 				this.whiteScoreLabel.cacheAsBitmap = true;
 			}
 			
 			this.evaluateButtons();
-			this.addChild(title);
+			if (title != null) this.addChild(title);
 			this.alignScores();
 			this.addChild(this.blackScoreLabel);
 			this.addChild(this.whiteScoreLabel);
@@ -369,7 +453,18 @@ package
 		private function alignScores():void
 		{
 			var gutterDimensions:Object = this.getGutterDimensions();
-			if (this.getOrientation() == LANDSCAPE)
+			if (this.headToHead)
+			{
+				var usableGutter:uint = gutterDimensions.height - this.backButton.height;
+				
+				this.whiteScoreLabel.rotation = 180;
+				this.whiteScoreLabel.x = (this.stage.stageWidth / 2) + (this.whiteScoreLabel.width / 2);
+				this.whiteScoreLabel.y = (gutterDimensions.height / 2) - (this.whiteScoreLabel.height / 2) - 4;
+				
+				Layout.centerHorizontally(this.blackScoreLabel, this.stage);
+				this.blackScoreLabel.y = (this.stage.stageHeight - (this.blackScoreLabel.height / 2)) + 8;
+			}
+			else if (this.getOrientation() == LANDSCAPE)
 			{
 				Layout.centerVertically(this.blackScoreLabel, this.stage);
 				this.blackScoreLabel.x = (gutterDimensions.width / 2) - (this.blackScoreLabel.textWidth / 2);
@@ -735,6 +830,11 @@ package
 						{
 							stoneEffectTimer.stop();
 							stoneEffectTimer.removeEventListener(TimerEvent.TIMER, animate);
+							if (this.layoutPending)
+							{
+								this.doLayout();
+								this.layoutPending = false;
+							}
 						}
 					}
 				}
@@ -856,6 +956,8 @@ package
 		{
 			this.backButton.enabled = (this.historyIndex == 0) ? false : true;
 			this.nextButton.enabled = (this.history[this.historyIndex+1] == null) ? false : true;
+			if (this.backButton2 != null) this.backButton2.enabled = (this.historyIndex == 0) ? false : true;
+			if (this.nextButton2 != null) this.nextButton2.enabled = (this.history[this.historyIndex+1] == null) ? false : true;
 		}
 		
 		private function calculateScore():void
