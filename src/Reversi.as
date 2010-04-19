@@ -97,7 +97,7 @@ package
 		private var board:Sprite;
 		private var stones:Array;
 		private var turn:Boolean;
-		private var pieces:Vector.<Sprite>;
+		private var pieces:Vector.<Bitmap>;
 		private var history:Array;
 		private var historyIndex:int;
 		private var blackScoreLabel:Label, whiteScoreLabel:Label;
@@ -302,6 +302,7 @@ package
 			this.blackStoneBitmap = new Bitmap(tmpStoneBitmapData);
 
 			this.placeStones();
+			if (CACHE_AS_BITMAP) this.board.cacheAsBitmap = true;
 			this.board.addEventListener(MouseEvent.CLICK, onBoardClicked);
 
 			var gutterWidth:uint, gutterHeight:uint, scoreSize:uint;
@@ -628,7 +629,7 @@ package
 
 		private function placeStones():void
 		{
-			this.pieces = new Vector.<Sprite>(64);
+			this.pieces = new Vector.<Bitmap>(64);
 			while (this.board.numChildren > 0) this.board.removeChildAt(0);
 			var cellSize:Number = (this.board.width / 8); 
 			var stoneSize:Number = cellSize - 2;
@@ -647,19 +648,15 @@ package
 		private function placeStone(color:Boolean, x:uint, y:uint):void
 		{
 			this.removePieceFromBoard(x, y);
-			var stone:Sprite = this.getStone(color, x, y);
+			var stone:Bitmap = this.getStone(color, x, y);
 			this.pieces[this.coordinatesToIndex(x, y)] = stone;
 			this.board.addChild(stone);
 		}
 		
-		private function getStone(color:Boolean, x:uint, y:uint):Sprite
+		private function getStone(color:Boolean, x:uint, y:uint):Bitmap
 		{
 			var cellSize:Number = (this.board.width / 8); 
-			var stone:Sprite = new Sprite();
-			stone.mouseEnabled = false;
-			stone.graphics.beginBitmapFill((color == WHITE) ? this.whiteStoneBitmap.bitmapData : this.blackStoneBitmap.bitmapData, null, false, false);
-			stone.graphics.drawRect(0, 0, this.whiteStoneBitmap.bitmapData.width, this.whiteStoneBitmap.bitmapData.height);
-			stone.graphics.endFill();
+			var stone:Bitmap = (color == WHITE) ? new Bitmap(this.whiteStoneBitmap.bitmapData) : new Bitmap(this.blackStoneBitmap.bitmapData);
 			stone.x = (x * cellSize) + 2;
 			stone.y = (y * cellSize) + 2;
 			return stone;
@@ -801,7 +798,7 @@ package
 		
 		private function playStoneEffects(stonesToTurn:Array):void
 		{
-			var newStones:Array = new Array(), oldStones:Array = new Array(), newStone:Sprite, oldStone:Sprite;
+			var newStones:Array = new Array(), oldStones:Array = new Array(), newStone:Bitmap, oldStone:Bitmap;
 			for each (var stoneToTurn:Object in stonesToTurn)
 			{
 				var index:uint = this.coordinatesToIndex(stoneToTurn.x, stoneToTurn.y);
@@ -817,8 +814,8 @@ package
 			{
 				for (var i:uint = 0; i < newStones.length; ++i)
 				{
-					newStone = newStones[i] as Sprite;
-					oldStone = oldStones[i] as Sprite;
+					newStone = newStones[i] as Bitmap;
+					oldStone = oldStones[i] as Bitmap;
 					
 					newStone.alpha += .1;
 					oldStone.alpha -= .1;
