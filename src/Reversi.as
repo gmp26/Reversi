@@ -117,7 +117,7 @@ package
 		private var whiteStoneBitmap:Bitmap;
 		private var blackStoneBitmap:Bitmap;
 		private var layoutPending:Boolean;
-		private var headToHead:Boolean;
+		private var flat:Boolean;
 		private var accelerometer:Accelerometer;
 		
 		public function Reversi(ppi:Number = -1)
@@ -196,14 +196,14 @@ package
 		private function onAccelerometerUpdated(e:AccelerometerEvent):void
 		{
 			if (this.getOrientation() != PORTRAIT || this.playerMode != TWO_PLAYER_MODE) return;
-			if (!this.headToHead && e.accelerationZ <= -.999)
+			if (!this.flat && e.accelerationZ <= -.999)
 			{
-				this.headToHead = true;
+				this.flat = true;
 				this.doLayout();
 			}
-			else if (this.headToHead && e.accelerationZ >= -.999)
+			else if (this.flat && e.accelerationZ >= -.999)
 			{
-				this.headToHead = false;
+				this.flat = false;
 				this.doLayout();
 			}
 		}
@@ -310,9 +310,9 @@ package
 			this.backButton2 = null;
 			this.nextButton2 = null;
 			
-			if (this.headToHead && this.getOrientation() != PORTRAIT) this.headToHead = false;
+			if (this.flat && this.getOrientation() != PORTRAIT) this.flat = false;
 			
-			if (this.headToHead) // Head-to-head
+			if (this.flat) // Head-to-head
 			{
 				gutterHeight = (stageHeight - boardSize) / 2;
 				gutterWidth = stageWidth;
@@ -454,7 +454,7 @@ package
 		private function alignScores():void
 		{
 			var gutterDimensions:Object = this.getGutterDimensions();
-			if (this.headToHead)
+			if (this.flat)
 			{
 				var usableGutter:uint = gutterDimensions.height - this.backButton.height;
 				
