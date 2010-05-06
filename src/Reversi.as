@@ -56,7 +56,9 @@ package
 	import flash.filters.BevelFilter;
 	import flash.filters.BlurFilter;
 	import flash.filters.DropShadowFilter;
+	import flash.filters.GlowFilter;
 	import flash.geom.Matrix;
+	import flash.media.Video;
 	import flash.net.SharedObject;
 	import flash.net.registerClassAlias;
 	import flash.sensors.Accelerometer;
@@ -119,6 +121,8 @@ package
 		private var layoutPending:Boolean;
 		private var flat:Boolean;
 		private var accelerometer:Accelerometer;
+		private var reticlePosition:Object;
+		private var reticleFilter:GlowFilter;
 		
 		public function Reversi(ppi:Number = -1)
 		{
@@ -188,6 +192,7 @@ package
 			this.turnFilter = new BlurFilter(8, 8, 1);
 			this.stoneBevel = new BevelFilter(.75, 45, 0xffffff, 1, 0x000000, 1);
 			this.boardShadow = new DropShadowFilter(0, 90, 0, 1, 10, 10, 1, 1);
+			this.reticleFilter = new GlowFilter(0xffff00);
 			this.stoneEffectTimer = new Timer(STONE_EFFECT_INTERVAL);
 			this.computerWaitTimer = new Timer(COMPUTER_WAIT_TIME);
 			this.layoutPending = false;
@@ -508,15 +513,92 @@ package
 		
 		private function onKeyDown(e:KeyboardEvent):void
 		{
-			switch (e.keyCode)
+			if (this.reticlePosition == null && e.keyCode != Keyboard.ENTER)
 			{
-				case Keyboard.RIGHT:
-					this.onNext();
-					break;
-				case Keyboard.LEFT:
-					this.onBack();
-					break;
+				switch (e.keyCode)
+				{
+					case Keyboard.RIGHT:
+						this.onNext();
+						return;
+					case Keyboard.LEFT:
+						this.onBack();
+						return;
+				}
 			}
+
+			if ((this.playerMode == SINGLE_PLAYER_MODE && this.turn == this.computerColor) || this.stoneEffectTimer.running) return;
+			
+			if (e.keyCode == Keyboard.ENTER) // either starting or finishing a keyboard move
+			{
+				if (this.reticlePosition == null) // starting
+				{
+					for (var x:uint = 0; x < 8; ++x)
+					{
+						for (var y:uint = 0; y < 8; ++y)
+						{
+							if (this.stones[x][y] == null)
+							{
+								this.reticlePosition = {"x":x, "y":y};
+								this.placeReticleStone();
+								return;
+							}
+						}
+					}
+				}
+				else // finishing
+				{
+					if (this.findCaptures(this.turn, this.reticlePosition.x, this.reticlePosition.y, false) > 0)
+					{
+						var me:MouseEvent = new MouseEvent(MouseEvent.CLICK);
+						me.localX = this.reticlePosition.x * this.board.width / 8;
+						me.localY = this.reticlePosition.y * this.board.width / 8;
+						this.board.dispatchEvent(me);
+						this.reticlePosition = null;
+					}
+				}
+				return;
+			}
+
+			if (this.reticlePosition != null)
+			{
+				switch (e.keyCode)
+				{
+					case Keyboard.RIGHT:
+						this.moveReticle(this.reticlePosition.x, this.reticlePosition.y, 1, 0);
+						break;
+					case Keyboard.LEFT:
+						this.moveReticle(this.reticlePosition.x, this.reticlePosition.y, -1, 0);
+						break;
+					case Keyboard.UP:
+						this.moveReticle(this.reticlePosition.x, this.reticlePosition.y, 0, -1);
+						break;
+					case Keyboard.DOWN:
+						this.moveReticle(this.reticlePosition.x, this.reticlePosition.y, 0, 1);
+						break;
+					case Keyboard.ESCAPE:
+						this.removePieceFromBoard(this.reticlePosition.x, this.reticlePosition.y);
+						this.reticlePosition = null;
+						break;
+				}
+			}
+		}
+		
+		private function moveReticle(reticleX:int, reticleY:int, deltaX:int, deltaY:int):void
+		{
+			var newX:int = reticleX + deltaX;
+			var newY:int = reticleY + deltaY;
+			if (newX < 0 || newX > 7 || newY < 0 || newY > 7)
+			{
+				return;
+			}
+			if (this.stones[newX][newY] != null)
+			{
+				this.moveReticle((reticleX + deltaX), (reticleY + deltaY), deltaX, deltaY);
+				return;
+			}
+			this.removePieceFromBoard(this.reticlePosition.x, this.reticlePosition.y);
+			this.reticlePosition = {"x":newX, "y":newY};
+			this.placeReticleStone();
 		}
 		
 		private function onBack(e:MouseEvent = null):void
@@ -641,6 +723,10 @@ package
 					this.placeStone(this.stones[x][y], x, y);
 				}
 			}
+			if (this.reticlePosition != null)
+			{
+				this.placeReticleStone();
+			}
 			// TBD: Probably remove. This should be happning when the filter is applied.
 			if (CACHE_AS_BITMAP) this.board.cacheAsBitmap = true;
 		}
@@ -651,6 +737,20 @@ package
 			var stone:Bitmap = this.getStone(color, x, y);
 			this.pieces[this.coordinatesToIndex(x, y)] = stone;
 			this.board.addChild(stone);
+		}
+		
+		private function placeThisStone(stone:Bitmap, x:uint, y:uint):void
+		{
+			this.removePieceFromBoard(x, y);
+			this.pieces[this.coordinatesToIndex(x, y)] = stone;
+			this.board.addChild(stone);
+		}
+
+		private function placeReticleStone():void
+		{
+			var stone:Bitmap = this.getStone(this.turn, this.reticlePosition.x, this.reticlePosition.y);
+			stone.filters = [this.reticleFilter];
+			this.placeThisStone(stone, this.reticlePosition.x, this.reticlePosition.y);
 		}
 		
 		private function getStone(color:Boolean, x:uint, y:uint):Bitmap
@@ -667,7 +767,8 @@ package
 			var index:uint = this.coordinatesToIndex(x, y);
 			if (this.pieces[index] != null)
 			{
-				this.board.removeChild(Sprite(this.pieces[index]));
+				this.board.removeChild(Bitmap(this.pieces[index]));
+				this.pieces[index] = null;
 			}
 		}
 		
