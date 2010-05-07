@@ -41,8 +41,11 @@ package com.christiancantrell.components
 	import flash.display.Sprite;
 	import flash.display.Stage;
 	import flash.events.Event;
+	import flash.events.KeyboardEvent;
 	import flash.events.MouseEvent;
 	import flash.filters.BlurFilter;
+	import flash.filters.GlowFilter;
+	import flash.ui.Keyboard;
 	
 	[Event(name=AlertEvent.ALERT_CLICKED, type="com.christiancantrell.components.AlertEvent")]
 	public class Alert extends Sprite
@@ -66,17 +69,21 @@ package com.christiancantrell.components
 		private var _title:String;
 		private var _message:String;
 		private var _buttonLabels:Array;
+		private var buttons:Array;
+		private var selectionIndex:int;
+		private var selectionFilter:GlowFilter;
 
 		public function Alert(stage:Stage, ppi:uint)
 		{
 			this._stage = stage;
 			this._ppi = ppi;
-			//this.titleFontSize  = Ruler.mmToPixels(7, this._ppi);
-			//this.textFontSize   = Ruler.mmToPixels(5, this._ppi);
-			//this.buttonFontSize = Ruler.mmToPixels(5, this._ppi);
 			this.titleFontSize  = 20;
 			this.textFontSize   = 18;
 			this.buttonFontSize = 18;
+			this._stage.addEventListener(KeyboardEvent.KEY_DOWN, onKeyDown);
+			this.buttons = new Array();
+			this.selectionIndex = -1;
+			this.selectionFilter = new GlowFilter(0xffff00);
 		}
 		
 		public function show(title:String, message:String, buttonLabels:Array = null):void
@@ -117,6 +124,7 @@ package com.christiancantrell.components
 				button_1.x = (bgWidth / 2) - (button_1.width / 2);
 				button_1.y = (messageLabel.y + messageLabel.textHeight) + MARGIN;
 				box.addChild(button_1);
+				this.buttons.push(button_1);
 			}
 			else if (buttonCount == 2)
 			{
@@ -128,6 +136,8 @@ package com.christiancantrell.components
 				button_3.y = button_2.y;
 				box.addChild(button_2);
 				box.addChild(button_3);
+				this.buttons.push(button_2);
+				this.buttons.push(button_3);
 			}
 			else if (buttonCount > 2)
 			{
@@ -139,6 +149,7 @@ package com.christiancantrell.components
 					button.y = buttonY;
 					box.addChild(button);
 					buttonY += buttonHeight + MARGIN;
+					this.buttons.push(button);
 				}
 			}
 			
@@ -188,11 +199,12 @@ package com.christiancantrell.components
 			return button;
 		}
 		
-		private function onClick(e:MouseEvent):void
+		private function onClick(e:MouseEvent = null):void
 		{
 			this.removeEventListener(MouseEvent.CLICK, onClick);
 			this._stage.removeChild(this);
 			this._stage.removeEventListener(Event.RESIZE, doLayout);
+			this._stage.removeEventListener(KeyboardEvent.KEY_DOWN, onKeyDown);
 			this.dispatchEvent(new AlertEvent());
 		}
 		
@@ -201,6 +213,7 @@ package com.christiancantrell.components
 			e.stopPropagation();
 			this._stage.removeChild(this);
 			this._stage.removeEventListener(Event.RESIZE, doLayout);
+			this._stage.removeEventListener(KeyboardEvent.KEY_DOWN, onKeyDown);
 			var button:Sprite = e.target as Sprite;
 			var label:Label = button.getChildAt(0) as Label;
 			var ae:AlertEvent = new AlertEvent();
@@ -230,6 +243,50 @@ package com.christiancantrell.components
 			{
 				button.removeChildAt(1);
 			}
+		}
+		
+		private function onKeyDown(e:KeyboardEvent):void
+		{
+			e.stopImmediatePropagation();
+			if (e.keyCode == Keyboard.ENTER)
+			{
+				if (this.selectionIndex < 0)
+				{
+					this.onClick(null);
+					return;
+				}
+				var selectedButton:Sprite = this.buttons[this.selectionIndex] as Sprite;
+				var me:MouseEvent = new MouseEvent(MouseEvent.CLICK);
+				selectedButton.dispatchEvent(me);
+				return;
+			}
+
+			if (this.selectionIndex != -1)
+			{
+				var oldButton:Sprite = this.buttons[this.selectionIndex] as Sprite;
+				oldButton.filters = null;
+			}
+			
+			switch (e.keyCode)
+			{
+				case Keyboard.UP:
+					--this.selectionIndex;
+					if (this.selectionIndex < 0)
+					{
+						this.selectionIndex = buttons.length - 1;
+					}
+					break;
+				case Keyboard.DOWN:
+					++this.selectionIndex;
+					if (this.selectionIndex == this.buttons.length)
+					{
+						this.selectionIndex = 0;
+					}
+					break;
+			}
+			if (this.selectionIndex < 0) return;
+			var button:Sprite = this.buttons[this.selectionIndex] as Sprite;
+			button.filters = [this.selectionFilter];
 		}
 	}
 }

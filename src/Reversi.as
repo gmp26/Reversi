@@ -513,6 +513,7 @@ package
 		
 		private function onKeyDown(e:KeyboardEvent):void
 		{
+			if (this.isAlertShowing()) return;
 			if (this.reticlePosition == null && e.keyCode != Keyboard.ENTER)
 			{
 				switch (e.keyCode)
@@ -522,6 +523,12 @@ package
 						return;
 					case Keyboard.LEFT:
 						this.onBack();
+						return;
+					case Keyboard.UP:
+						this.onNewGameButtonClicked(null);
+						return;
+					case Keyboard.DOWN:
+						this.onNewGameButtonClicked(null);
 						return;
 				}
 			}
@@ -587,8 +594,44 @@ package
 		{
 			var newX:int = reticleX + deltaX;
 			var newY:int = reticleY + deltaY;
-			if (newX < 0 || newX > 7 || newY < 0 || newY > 7)
+			if (newX < 0 && newY == 0)
 			{
+				this.moveReticle(8, 7, deltaX, deltaY);
+				return;
+			}
+			else if (newX == 8 && newY == 7)
+			{
+				this.moveReticle(-1, 0, deltaX, deltaY);
+				return;
+			}
+			else if (newX == 0 && newY == -1)
+			{
+				this.moveReticle(7, 8, deltaX, deltaY);
+				return;
+			}
+			else if (newX == 7 && newY == 8)
+			{
+				this.moveReticle(0, -1 , deltaX, deltaY);
+				return;
+			}
+			else if (newX < 0)
+			{
+				this.moveReticle(8, (reticleY - 1), deltaX, deltaY);
+				return;
+			}
+			else if (newX > 7)
+			{
+				this.moveReticle(-1, (reticleY + 1), deltaX, deltaY);
+				return;
+			}
+			else if (newY < 0)
+			{
+				this.moveReticle(reticleX - 1, 8, deltaX, deltaY);
+				return;
+			}
+			else if (newY > 7)
+			{
+				this.moveReticle(reticleX + 1, -1, deltaX, deltaY);
 				return;
 			}
 			if (this.stones[newX][newY] != null)
@@ -625,11 +668,21 @@ package
 			this.onTurnFinished(false, false);
 		}
 		
-		private function onNewGameButtonClicked(e:MouseEvent):void
+		private function isAlertShowing():Boolean
 		{
+			for (var i:uint = 0; i < this.stage.numChildren; ++i)
+			{
+				if (this.stage.getChildAt(i) is Alert) return true;
+			}
+			return false;
+		}
+		
+		private function onNewGameButtonClicked(e:MouseEvent = null):void
+		{
+			if (this.isAlertShowing()) return;
 			var alert:Alert = new Alert(this.stage, this.ppi);
 			alert.addEventListener(AlertEvent.ALERT_CLICKED, onNewGameConfirm);
-			alert.show	("Confirm", "Do you want to start a new game?", [SINGLE_PLAYER_STRING, TWO_PLAYER_STRING, CANCEL_STRING]);
+			alert.show("Confirm", "Do you want to start a new game?", [SINGLE_PLAYER_STRING, TWO_PLAYER_STRING, CANCEL_STRING]);
 		}
 		
 		private function onNewGameConfirm(e:AlertEvent):void
@@ -954,6 +1007,7 @@ package
 			if ((this.blackScore + this.whiteScore) == 64) // All stones played. Game is over.
 			{
 				var allStonesPlayedAlert:Alert = new Alert(this.stage, this.ppi);
+				allStonesPlayedAlert.addEventListener(AlertEvent.ALERT_CLICKED, genericAlertClicked);
 				if (this.blackScore == this.whiteScore) // Tie game
 				{
 					allStonesPlayedAlert.show("Tie Game!", "Good job! You both finished with the exact same number of stones.");
@@ -965,10 +1019,11 @@ package
 				this.finishTurn(saveHistory);
 				return;
 			}
-			
+						
 			if (this.blackScore == 0 || this.whiteScore == 0) // All stones captured. Game over.
 			{
 				var allStonesCapturedAlert:Alert = new Alert(this.stage, this.ppi);
+				allStonesCapturedAlert.addEventListener(AlertEvent.ALERT_CLICKED, genericAlertClicked);
 				var zeroPlayer:String = (this.blackScore == 0) ? BLACK_COLOR_NAME : WHITE_COLOR_NAME;
 				var nonZeroPlayer:String = (this.blackScore != 0) ? BLACK_COLOR_NAME : WHITE_COLOR_NAME;
 				allStonesCapturedAlert.show(nonZeroPlayer + " Wins!", nonZeroPlayer + " has captured all of " + zeroPlayer + "'s stones. Well done, " + nonZeroPlayer + "!");
@@ -979,6 +1034,7 @@ package
 			if (!this.isNextMovePossible(!this.turn)) // Neither player can make a move. Unusual, but possible. Game is over.
 			{
 				var noMoreMovesAlert:Alert = new Alert(this.stage, this.ppi);
+				noMoreMovesAlert.addEventListener(AlertEvent.ALERT_CLICKED, genericAlertClicked);
 				if (this.blackScore == this.whiteScore) // Tie game
 				{
 					noMoreMovesAlert.show("Tie Game!", "Neither player can make a move, and you both have the exact same number of stones. Good game!");
@@ -1001,6 +1057,12 @@ package
 			this.finishTurn(saveHistory);
 		}
 
+		private function genericAlertClicked(e:AlertEvent):void
+		{
+			var alert:Alert = e.target as Alert;
+			alert.removeEventListener(AlertEvent.ALERT_CLICKED, genericAlertClicked);
+		}
+		
 		private function finishTurn(saveHistory:Boolean):void
 		{
 			if (saveHistory) this.saveHistory();
