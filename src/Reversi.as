@@ -41,7 +41,6 @@ package
 	import com.christiancantrell.utils.Layout;
 	import com.christiancantrell.utils.Ruler;
 	
-	import flash.accessibility.Accessibility;
 	import flash.display.Bitmap;
 	import flash.display.BitmapData;
 	import flash.display.GradientType;
@@ -58,7 +57,6 @@ package
 	import flash.filters.DropShadowFilter;
 	import flash.filters.GlowFilter;
 	import flash.geom.Matrix;
-	import flash.media.Video;
 	import flash.net.SharedObject;
 	import flash.net.registerClassAlias;
 	import flash.sensors.Accelerometer;
@@ -330,7 +328,6 @@ package
 				buttonWidth = stageWidth / 3;
 				buttonHeight = Ruler.mmToPixels(8, this.ppi);
 				buttonTextSize = Ruler.mmToPixels(5.5, this.ppi);
-				
 				
 				// Buttons
 				this.backButton = new TextButton("BACK", buttonTextSize, true, buttonWidth, buttonHeight);
