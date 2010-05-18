@@ -1,1 +1,13 @@
-A simple Reversi game written in ActionScript. It's designed to run on any device that supports Flash/AIR, regardless of screen size.
+A Reversi game written in ActionScript. It's designed to run on any device that supports Flash/AIR, regardless of screen size.
+
+This project contains all the game logic, but it must be used with one of the platform-specific wrapper projects below:
+
+ReversiAndroid  http://github.com/cantrell/Reversi-Android 
+ReversiBrowser  http://github.com/cantrell/Reversi-Browser 
+ReversiDesktop  http://github.com/cantrell/Reversi-Desktop
+ReversiIpad     http://github.com/cantrell/Reversi-iPad 
+ReversiIphone   http://github.com/cantrell/Reversi-iPhone
+
+For information on how to build this project for any platform, see the Reversi wiki:
+
+http://wiki.github.com/cantrell/Reversi/
