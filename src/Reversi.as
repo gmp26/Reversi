@@ -121,6 +121,8 @@ package
 		private var accelerometer:Accelerometer;
 		private var reticlePosition:Object;
 		private var reticleFilter:GlowFilter;
+		private var stageWidth:int;
+		private var stageHeight:int;
 		
 		public function Reversi(ppi:Number = -1)
 		{
@@ -180,7 +182,7 @@ package
 		private function onAddedToDisplayList(e:Event):void
 		{
 			this.removeEventListener(Event.ADDED, onAddedToDisplayList);
-			this.stage.addEventListener(Event.RESIZE, doLayout);
+			if (!this.stage.hasEventListener(Event.RESIZE)) this.stage.addEventListener(Event.RESIZE, doLayout);
 			this.stage.addEventListener(KeyboardEvent.KEY_DOWN, onKeyDown);
 		}
 		
@@ -227,30 +229,32 @@ package
 			// Remove any children that have already been added.
 			while (this.numChildren > 0) this.removeChildAt(0);
 
-			if (stageWidth  == -1) stageWidth  = this.stage.stageWidth;
-			if (stageHeight == -1) stageHeight = this.stage.stageHeight;
+			this.stageWidth = (stageWidth == -1)   ? this.stage.stageWidth  : stageWidth;
+			this.stageHeight = (stageHeight == -1) ? this.stage.stageHeight : stageHeight;
+
+			if (this.stageWidth == 0 || this.stageHeight == 0) return;
 			
 			// Draw the background
 			var bg:Sprite = new Sprite();
 			bg.graphics.beginFill(BACKGROUND_COLOR);
-			bg.graphics.drawRect(0, 0, stageWidth, stageHeight);
+			bg.graphics.drawRect(0, 0, this.stageWidth, this.stageHeight);
 			bg.graphics.endFill();
 			this.addChild(bg);
 			
 			// Figure out the size of the board
-			var boardSize:uint = Math.min(stageWidth, stageHeight);
+			var boardSize:uint = Math.min(this.stageWidth, this.stageHeight);
 			
 			// Figure out the placement of the board
 			var boardX:uint, boardY:uint;
-			if (boardSize == stageWidth)
+			if (boardSize == this.stageWidth)
 			{
 				boardX = 0;
-				boardY = (stageHeight - stageWidth) / 2;
+				boardY = (this.stageHeight - this.stageWidth) / 2;
 			}
 			else
 			{
 				boardY = 0;
-				boardX = (stageWidth - stageHeight) / 2;
+				boardX = (this.stageWidth - this.stageHeight) / 2;
 			}
 
 			// Create the board and place it
@@ -317,15 +321,15 @@ package
 			
 			if (this.flat) // Head-to-head
 			{
-				gutterHeight = (stageHeight - boardSize) / 2;
-				gutterWidth = stageWidth;
+				gutterHeight = (this.stageHeight - boardSize) / 2;
+				gutterWidth = this.stageWidth;
 
 				// Scores
 				scoreSize = gutterHeight * .6;;
 				this.blackScoreLabel = new Label(String(this.blackScore), "bold", BLACK_COLOR, "_sans", scoreSize);
 				this.whiteScoreLabel = new Label(String(this.whiteScore), "bold", WHITE_COLOR, "_sans", scoreSize);
 
-				buttonWidth = stageWidth / 3;
+				buttonWidth = this.stageWidth / 3;
 				buttonHeight = Ruler.mmToPixels(8, this.ppi);
 				buttonTextSize = Ruler.mmToPixels(5.5, this.ppi);
 				
@@ -333,7 +337,7 @@ package
 				this.backButton = new TextButton("BACK", buttonTextSize, true, buttonWidth, buttonHeight);
 				this.backButton.addEventListener(MouseEvent.CLICK, this.onBack);
 				this.backButton.x = 2;
-				this.backButton.y = (stageHeight - this.backButton.height) - 1;
+				this.backButton.y = (this.stageHeight - this.backButton.height) - 1;
 				this.addChild(this.backButton);
 				
 				this.nextButton = new TextButton("NEXT", buttonTextSize, true, buttonWidth, buttonHeight);
@@ -359,8 +363,8 @@ package
 			}
 			else if (this.getOrientation() == PORTRAIT) // Portrait
 			{
-				gutterHeight = (stageHeight - boardSize) / 2;
-				gutterWidth = stageWidth;
+				gutterHeight = (this.stageHeight - boardSize) / 2;
+				gutterWidth = this.stageWidth;
 
 				// Scores
 				scoreSize = gutterHeight * .6;;
@@ -372,14 +376,14 @@ package
 				title.y = title.height;
 				Layout.centerHorizontally(title, this.stage);
 
-				buttonWidth = stageWidth / 3;
+				buttonWidth = this.stageWidth / 3;
 				buttonHeight = Ruler.mmToPixels(8, this.ppi);
 				buttonTextSize = Ruler.mmToPixels(5.5, this.ppi);
 				
 				this.backButton = new TextButton("BACK", buttonTextSize, true, buttonWidth, buttonHeight);
 				this.backButton.addEventListener(MouseEvent.CLICK, this.onBack);
 				this.backButton.x = 2;
-				this.backButton.y = (stageHeight - this.backButton.height) - 1;
+				this.backButton.y = (this.stageHeight - this.backButton.height) - 1;
 				this.addChild(this.backButton);
 				
 				newGameButton = new TextButton("NEW", buttonTextSize, true, buttonWidth - 6, buttonHeight);
@@ -396,8 +400,8 @@ package
 			}
 			else // Landscape
 			{
-				gutterWidth = (stageWidth - boardSize) / 2;
-				gutterHeight = stageHeight;
+				gutterWidth = (this.stageWidth - boardSize) / 2;
+				gutterHeight = this.stageHeight;
 
 				// Scores
 				scoreSize = gutterWidth * .75;
@@ -414,7 +418,7 @@ package
 				buttonTextSize = ((gutterWidth / 3) > 42) ? 42 : ((gutterWidth / 3) - 1);
 
 				newGameButton = new TextButton("NEW", buttonTextSize, true, buttonWidth, buttonHeight);
-				newGameButton.x = (stageWidth - gutterWidth) + ((gutterWidth - newGameButton.width) / 2);
+				newGameButton.x = (this.stageWidth - gutterWidth) + ((gutterWidth - newGameButton.width) / 2);
 				newGameButton.y = 5;
 				newGameButton.addEventListener(MouseEvent.CLICK, onNewGameButtonClicked);
 				this.addChild(newGameButton);
@@ -422,13 +426,13 @@ package
 				this.backButton = new TextButton("BACK", buttonTextSize, true, buttonWidth, buttonHeight);
 				this.backButton.addEventListener(MouseEvent.CLICK, this.onBack);
 				this.backButton.x = (gutterWidth - this.backButton.width) / 2;
-				this.backButton.y = (stageHeight - this.backButton.height);
+				this.backButton.y = (this.stageHeight - this.backButton.height);
 				this.addChild(this.backButton);
 				
 				this.nextButton = new TextButton("NEXT", buttonTextSize, true, buttonWidth, buttonHeight);
 				this.nextButton.addEventListener(MouseEvent.CLICK, this.onNext);
 				this.nextButton.x = newGameButton.x;
-				this.nextButton.y = (stageHeight - this.nextButton.height);
+				this.nextButton.y = (this.stageHeight - this.nextButton.height);
 				this.addChild(this.nextButton);
 			}
 			
@@ -461,18 +465,18 @@ package
 				var usableGutter:uint = gutterDimensions.height - this.backButton.height;
 				
 				this.whiteScoreLabel.rotation = 180;
-				this.whiteScoreLabel.x = (this.stage.stageWidth / 2) + (this.whiteScoreLabel.width / 2);
+				this.whiteScoreLabel.x = (this.stageWidth / 2) + (this.whiteScoreLabel.width / 2);
 				this.whiteScoreLabel.y = (gutterDimensions.height / 2) - (this.whiteScoreLabel.height / 2) - 4;
 				
 				Layout.centerHorizontally(this.blackScoreLabel, this.stage);
-				this.blackScoreLabel.y = (this.stage.stageHeight - (this.blackScoreLabel.height / 2)) + 8;
+				this.blackScoreLabel.y = (this.stageHeight - (this.blackScoreLabel.height / 2)) + 8;
 			}
 			else if (this.getOrientation() == LANDSCAPE)
 			{
 				Layout.centerVertically(this.blackScoreLabel, this.stage);
 				this.blackScoreLabel.x = (gutterDimensions.width / 2) - (this.blackScoreLabel.textWidth / 2);
 				Layout.centerVertically(this.whiteScoreLabel, this.stage);
-				this.whiteScoreLabel.x = this.stage.stageWidth - ((gutterDimensions.width / 2) + (this.whiteScoreLabel.textWidth / 2));
+				this.whiteScoreLabel.x = this.stageWidth - ((gutterDimensions.width / 2) + (this.whiteScoreLabel.textWidth / 2));
 			}
 			else
 			{
@@ -486,7 +490,7 @@ package
 		
 		private function getOrientation():String
 		{
-			return (this.stage.stageHeight > this.stage.stageWidth) ? PORTRAIT : LANDSCAPE;
+			return (this.stageHeight > this.stageWidth) ? PORTRAIT : LANDSCAPE;
 		}
 
 		private function getGutterDimensions():Object
@@ -495,13 +499,13 @@ package
 			var gutterWidth:uint, gutterHeight:uint;
 			if (this.getOrientation() == PORTRAIT)
 			{
-				gutterWidth = this.stage.stageWidth;
-				gutterHeight = (this.stage.stageHeight - this.board.width) / 2;
+				gutterWidth = this.stageWidth;
+				gutterHeight = (this.stageHeight - this.board.width) / 2;
 			}
 			else
 			{
-				gutterWidth = (this.stage.stageWidth - this.board.width) / 2;
-				gutterHeight = this.stage.stageHeight;
+				gutterWidth = (this.stageWidth - this.board.width) / 2;
+				gutterHeight = this.stageHeight;
 			}
 			gutter.width = gutterWidth;
 			gutter.height = gutterHeight;
