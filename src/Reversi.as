@@ -201,12 +201,12 @@ package
 		private function onAccelerometerUpdated(e:AccelerometerEvent):void
 		{
 			if (this.getOrientation() != PORTRAIT || this.playerMode != TWO_PLAYER_MODE) return;
-			if (!this.flat && e.accelerationZ <= -.999)
+			if (!this.flat && e.accelerationZ > .97)
 			{
 				this.flat = true;
 				this.doLayout();
 			}
-			else if (this.flat && e.accelerationZ >= -.999)
+			else if (this.flat && e.accelerationZ < .97)
 			{
 				this.flat = false;
 				this.doLayout();
@@ -373,7 +373,7 @@ package
 
 				title = new Label(TITLE, "bold", TITLE_COLOR, "_sans", gutterHeight/4);
 				title.filters = [this.titleShadow];
-				title.y = title.height;
+				title.y = title.height + 4;
 				Layout.centerHorizontally(title, this.stage);
 
 				buttonWidth = this.stageWidth / 3;
@@ -410,7 +410,7 @@ package
 				
 				title = new Label(TITLE, "bold", TITLE_COLOR, "_sans", (gutterWidth/TITLE.length) + 4);
 				title.filters = [this.titleShadow];
-				title.y = title.height;
+				title.y = title.height + 4;
 				title.x = ((boardX / 2) - (title.width / 2) - 1);
 
 				buttonWidth = gutterWidth - 10;
