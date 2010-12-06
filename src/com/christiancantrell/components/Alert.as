@@ -94,7 +94,7 @@ package com.christiancantrell.components
 			this._stage.addEventListener(Event.RESIZE, doLayout);
 			this.doLayout();
 		}
-			
+		
 		public function doLayout(e:Event = null):void
 		{
 			while (this.numChildren > 0) this.removeChildAt(0);
@@ -201,13 +201,18 @@ package com.christiancantrell.components
 		
 		private function onClick(e:MouseEvent = null):void
 		{
+			this.close();
+			this.dispatchEvent(new AlertEvent());
+		}
+		
+		public function close():void
+		{
 			this.removeEventListener(MouseEvent.CLICK, onClick);
 			this._stage.removeChild(this);
 			this._stage.removeEventListener(Event.RESIZE, doLayout);
 			this._stage.removeEventListener(KeyboardEvent.KEY_DOWN, onKeyDown);
-			this.dispatchEvent(new AlertEvent());
 		}
-		
+
 		private function onButtonClick(e:MouseEvent):void
 		{
 			e.stopPropagation();
