@@ -51,12 +51,16 @@ package
 	import flash.events.Event;
 	import flash.events.KeyboardEvent;
 	import flash.events.MouseEvent;
+	import flash.events.NetStatusEvent;
 	import flash.events.TimerEvent;
 	import flash.filters.BevelFilter;
 	import flash.filters.BlurFilter;
 	import flash.filters.DropShadowFilter;
 	import flash.filters.GlowFilter;
 	import flash.geom.Matrix;
+	import flash.net.GroupSpecifier;
+	import flash.net.NetConnection;
+	import flash.net.NetGroup;
 	import flash.net.SharedObject;
 	import flash.net.registerClassAlias;
 	import flash.sensors.Accelerometer;
@@ -84,6 +88,7 @@ package
 		private const SINGLE_PLAYER_STRING:String = "Single Player Game";
 		private const TWO_PLAYER_MODE:String = "twoPlayerMode";
 		private const TWO_PLAYER_STRING:String = "Two Player Game";
+		private const NETWORK_PLAY_STRING:String = "Network";
 		private const CANCEL_STRING:String = "Cancel";
 		private const COMPUTER_COLOR_STRING:String = "Computer Plays ";
 		private const SO_KEY:String = "com.christiancantrell.reversi";
@@ -97,6 +102,7 @@ package
 		private var board:Sprite;
 		private var stones:Array;
 		private var turn:Boolean;
+		private var networkMode:Boolean;
 		private var pieces:Vector.<Bitmap>;
 		private var history:Array;
 		private var historyIndex:int;
@@ -123,6 +129,8 @@ package
 		private var reticleFilter:GlowFilter;
 		private var stageWidth:int;
 		private var stageHeight:int;
+		private var netConnection:NetConnection;
+		private var netGroup:NetGroup;
 		
 		public function Reversi(ppi:Number = -1)
 		{
@@ -645,7 +653,7 @@ package
 			this.placeReticleStone();
 		}
 		
-		private function onBack(e:MouseEvent = null):void
+		private function onBack(e:MouseEvent = null, propagateOnNetwork:Boolean = true):void
 		{
 			if (this.historyIndex == 0) return;
 			--this.historyIndex;
@@ -655,9 +663,16 @@ package
 			this.placeStones();
 			this.changeTurnIndicator();
 			this.onTurnFinished(false, false);
+			if (propagateOnNetwork)
+			{
+				var message:Object = new Object();
+				message.type = "history";
+				message.direction = "back";
+				this.sendNetworkMessage(message);
+			}
 		}
 		
-		private function onNext(e:MouseEvent = null):void
+		private function onNext(e:MouseEvent = null, propagateOnNetwork:Boolean = true):void
 		{
 			if (this.history[this.historyIndex+1] == null) return;
 			++this.historyIndex;
@@ -667,6 +682,13 @@ package
 			this.placeStones();
 			this.changeTurnIndicator();
 			this.onTurnFinished(false, false);
+			if (propagateOnNetwork)
+			{
+				var message:Object = new Object();
+				message.type = "history";
+				message.direction = "next";
+				this.sendNetworkMessage(message);
+			}
 		}
 		
 		private function isAlertShowing():Boolean
@@ -678,12 +700,21 @@ package
 			return false;
 		}
 		
+		private function getCurrentAlert():Alert
+		{
+			for (var i:uint = 0; i < this.stage.numChildren; ++i)
+			{
+				if (this.stage.getChildAt(i) is Alert) return this.stage.getChildAt(i) as Alert;
+			}
+			return null;
+		}
+		
 		private function onNewGameButtonClicked(e:MouseEvent = null):void
 		{
 			if (this.isAlertShowing()) return;
 			var alert:Alert = new Alert(this.stage, this.ppi);
 			alert.addEventListener(AlertEvent.ALERT_CLICKED, onNewGameConfirm);
-			alert.show("Confirm", "Do you want to start a new game?", [SINGLE_PLAYER_STRING, TWO_PLAYER_STRING, CANCEL_STRING]);
+			alert.show("Confirm", "Do you want to start a new game?", [SINGLE_PLAYER_STRING, TWO_PLAYER_STRING, NETWORK_PLAY_STRING, CANCEL_STRING]);
 		}
 		
 		private function onNewGameConfirm(e:AlertEvent):void
@@ -691,7 +722,9 @@ package
 			var alert:Alert = e.target as Alert;
 			alert.removeEventListener(AlertEvent.ALERT_CLICKED, onNewGameConfirm);
 			if (e.label == CANCEL_STRING) return;
+			this.networkMode = false;
 			this.deletePersistentData();
+			this.onNetworkPlayCanceled();
 			if (e.label == TWO_PLAYER_STRING)
 			{
 				this.playerMode = TWO_PLAYER_MODE;
@@ -701,7 +734,7 @@ package
 				this.calculateScore();
 				this.evaluateButtons();
 			}
-			else
+			else if (e.label == SINGLE_PLAYER_STRING)
 			{
 				var newAlert:Alert = new Alert(this.stage, this.ppi);
 				newAlert.addEventListener(AlertEvent.ALERT_CLICKED, onComputerColorChosen);
@@ -709,10 +742,138 @@ package
 							  "Choose a color for the computer. Remember, " + BLACK_COLOR_NAME + " always goes first.",
 							  [COMPUTER_COLOR_STRING + WHITE_COLOR_NAME, COMPUTER_COLOR_STRING + BLACK_COLOR_NAME, CANCEL_STRING]);
 			}
+			else if (e.label == NETWORK_PLAY_STRING)
+			{
+				this.networkMode = true;
+				var networkAlert:Alert = new Alert(this.stage, this.ppi);
+				networkAlert.addEventListener(AlertEvent.ALERT_CLICKED, onNetworkPlayCanceled);
+				networkAlert.show("Searching", "Looking for another player on the network.", [CANCEL_STRING]);
+				this.netConnection = new NetConnection();
+				this.netConnection.addEventListener(NetStatusEvent.NET_STATUS, onNetStatus);
+				this.netConnection.connect("rtmfp:");
+			}
 		}
 		
+		private function onNetworkPlayCanceled(e:AlertEvent = null):void
+		{
+			if (e != null)
+			{
+				var alert:Alert = e.target as Alert;
+				alert.removeEventListener(AlertEvent.ALERT_CLICKED, onNetworkPlayCanceled);
+			}
+			if (this.netGroup != null)
+			{
+				this.netGroup.close();
+				this.netGroup = null;
+			}
+			if (this.netConnection != null && this.netConnection.connected)
+			{
+				this.netConnection.close();
+				this.netConnection = null;
+			}
+			this.networkMode = false;
+		}
+		
+		private function onNetStatus(e:NetStatusEvent):void
+		{
+			switch(e.info.code)
+			{
+				case "NetConnection.Connect.Success":
+					this.setUpGroup();
+					break;
+				case "NetGroup.Connect.Success":
+					// NetGroup successfully set up.
+					break;
+				case "NetGroup.Neighbor.Connect":
+					var networkAlert:Alert = this.getCurrentAlert();
+					if (networkAlert != null) networkAlert.close();
+					var newAlert:Alert = new Alert(this.stage, this.ppi);
+					newAlert.addEventListener(AlertEvent.ALERT_CLICKED, onNetworkColorChosen);
+					newAlert.show("Choose a Color",
+						"Choose your color. Remember, " + BLACK_COLOR_NAME + " always goes first.",
+						[WHITE_COLOR_NAME, BLACK_COLOR_NAME, CANCEL_STRING]);
+					break;
+				case "NetGroup.Posting.Notify":
+					var message:Object = e.info.message;
+					if (message.type == "move")
+					{
+						this.makeMove(message.x, message.y);
+					}
+					else if (message.type == "setup")
+					{
+						var alert:Alert = this.getCurrentAlert();
+						if (alert != null) alert.close();
+						this.setupNetworkGame(message.opponentColor);
+					}
+					else if (message.type == "history")
+					{
+						if (message.direction == "back")
+						{
+							this.onBack(null, false);
+						}
+						else if (message.direction == "next")
+						{
+							this.onNext(null, false);
+						}
+					}
+					break;
+			}
+		}
+		
+		// TBD: IP address???
+		// TBD: Alert if peer is lost
+		private function setUpGroup():void
+		{
+			var groupspec:GroupSpecifier = new GroupSpecifier("iReverse");
+			groupspec.postingEnabled = true;
+			groupspec.ipMulticastMemberUpdatesEnabled = true;
+			groupspec.addIPMulticastAddress("225.225.0.1:30000");
+			this.netGroup = new NetGroup(this.netConnection, groupspec.groupspecWithAuthorizations());
+			this.netGroup.addEventListener(NetStatusEvent.NET_STATUS, onNetStatus);
+		}
+
+		private function onNetworkColorChosen(e:AlertEvent):void
+		{
+			var alert:Alert = e.target as Alert;
+			alert.removeEventListener(AlertEvent.ALERT_CLICKED, onNetworkColorChosen);
+			if (e.label == CANCEL_STRING)
+			{
+				this.onNetworkPlayCanceled();
+				return;
+			}
+			var message:Object = new Object();
+			message.type = "setup";
+			message.opponentColor = e.label;
+			message.sender = this.netGroup.convertPeerIDToGroupAddress(this.netConnection.nearID);
+			this.sendNetworkMessage(message);
+			this.setupNetworkGame((e.label == BLACK_COLOR_NAME) ? WHITE_COLOR_NAME : BLACK_COLOR_NAME);
+		}
+		
+		private function sendNetworkMessage(message:Object):void
+		{
+			if (!this.networkMode) return;
+			if (this.netConnection != null && this.netConnection.connected && this.netGroup != null && this.netGroup.neighborCount > 0)
+			{
+				message.time = new Date().time;
+				this.netGroup.post(message);
+			}
+		}
+		
+		private function setupNetworkGame(computerColorString:String):void
+		{
+			this.playerMode = SINGLE_PLAYER_MODE;
+			this.computerColor = (computerColorString == BLACK_COLOR_NAME) ? BLACK : WHITE;
+			this.prepareGame();
+			this.placeStones();
+			this.changeTurnIndicator();
+			this.calculateScore();
+			this.evaluateButtons();
+		}
+			
 		private function onComputerColorChosen(e:AlertEvent):void
 		{
+			var alert:Alert = e.target as Alert;
+			alert.removeEventListener(AlertEvent.ALERT_CLICKED, onComputerColorChosen);
 			if (e.label == CANCEL_STRING) return;
 			this.playerMode = SINGLE_PLAYER_MODE;
 			this.computerColor = (e.label == COMPUTER_COLOR_STRING + WHITE_COLOR_NAME) ? WHITE : BLACK;
@@ -839,7 +1000,7 @@ package
 			var x:uint = e.localX / scaleFactor;
 			var y:uint = e.localY / scaleFactor;
 			this.makeMove(x, y);
-			if (this.playerMode == SINGLE_PLAYER_MODE && this.turn == this.computerColor)
+			if (this.playerMode == SINGLE_PLAYER_MODE && this.turn == this.computerColor && !this.networkMode)
 			{
 				this.onStartComputerMove();
 			}
@@ -852,6 +1013,15 @@ package
 			this.placeStone(this.turn, x, y);
 			this.stones[x][y] = this.turn;
 			this.onTurnFinished(true, true);
+			if (this.networkMode)
+			{
+				var message:Object = new Object();
+				message.type = "move";
+				message.x = x;
+				message.y = y;
+				message.sender = this.netGroup.convertPeerIDToGroupAddress(this.netConnection.nearID);
+				this.sendNetworkMessage(message);
+			}
 		}
 		
 		private function deepCopyStoneArray(stoneArray:Array):Array
